@@ -13,6 +13,7 @@ import { DockingDemo } from './DockingDemo';
 import { Calculator } from './Calculator';
 import { CodexApp, ClaudeCodeApp, GeminiCodeApp, CursorAgentApp, DevinApp, JunieApp, CodyApp } from './AgentApps';
 import { GitHubApp, GitLabApp } from './OAuthApps';
+import { NotesApp } from './Notes';
 
 export const appCategories: AppCategory[] = [
   { id: 'system', name: 'System', icon: '⚙' },
@@ -144,6 +145,14 @@ export const appRegistry: AppDefinition[] = [
     category: 'agents',
     description: 'Sourcegraph Cody - AI code assistant with code intelligence',
     component: CodyApp,
+  },
+  {
+    id: 'notes',
+    name: 'Notes',
+    icon: '📝',
+    category: 'utilities',
+    description: 'Markdown notes with rich export',
+    component: NotesApp,
   },
   // Dev Tools - OAuth
   {

@@ -6,20 +6,32 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useDesktopStore } from '../core/store';
 import { appRegistry, appCategories } from '../apps/registry';
+import { LiquidGlass } from '../components/LiquidGlass';
 import './appMenu.css';
 
 export function AppMenuButton() {
   const { appMenuOpen, toggleAppMenu } = useDesktopStore();
 
   return (
-    <button
-      className={`kasm-panel-btn kasm-app-menu-btn ${appMenuOpen ? 'kasm-panel-btn--active' : ''}`}
+    <LiquidGlass
+      cornerRadius={8}
+      padding="0"
+      blurAmount={0.04}
+      saturation={160}
+      displacementScale={30}
+      aberrationIntensity={1}
+      elasticity={0.08}
       onClick={toggleAppMenu}
-      title="Applications"
+      style={{ display: 'inline-flex' }}
     >
-      <span className="kasm-panel-btn__icon">◆</span>
-      <span>Apps</span>
-    </button>
+      <div
+        className={`kasm-panel-btn kasm-app-menu-btn ${appMenuOpen ? 'kasm-panel-btn--active' : ''}`}
+        style={{ background: 'transparent' }}
+      >
+        <span className="kasm-panel-btn__icon">{'\u25C6'}</span>
+        <span>Apps</span>
+      </div>
+    </LiquidGlass>
   );
 }
 
