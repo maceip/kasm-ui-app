@@ -4,6 +4,7 @@
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import type { AppProps } from '../core/types';
+import { SplitPane } from '../layout/SplitPane';
 import { vfs } from './vfs';
 
 const NOTES_DIR = '/home/kasm-user/notes';
@@ -411,13 +412,10 @@ export const NotesApp: React.FC<AppProps> = ({ windowId, onTitleChange }) => {
   const [notes, setNotes] = useState<NoteEntry[]>([]);
   const [activeFile, setActiveFile] = useState<string | null>(null);
   const [content, setContent] = useState('');
-  const [sidebarWidth, setSidebarWidth] = useState(200);
-  const [splitPos, setSplitPos] = useState(50); // percent
+  // Layout managed by SplitPane component (no hand-rolled drag)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editorRef = useRef<HTMLTextAreaElement>(null);
-  const isDraggingSidebar = useRef(false);
-  const isDraggingSplit = useRef(false);
-  const containerRef = useRef<HTMLDivElement>(null);
+  // editorRef and saveTimer are the only refs needed
 
   // Ensure notes directory exists
   useEffect(() => {
@@ -571,143 +569,96 @@ ${html}
   // Parsed preview (memoized)
   const previewNodes = useMemo(() => parseMarkdown(content), [content]);
 
-  // Drag handlers for sidebar resize
-  const handleSidebarDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDraggingSidebar.current = true;
-    const startX = e.clientX;
-    const startWidth = sidebarWidth;
-
-    const onMove = (ev: MouseEvent) => {
-      if (!isDraggingSidebar.current) return;
-      const newWidth = Math.max(120, Math.min(350, startWidth + ev.clientX - startX));
-      setSidebarWidth(newWidth);
-    };
-    const onUp = () => {
-      isDraggingSidebar.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [sidebarWidth]);
-
-  // Drag handlers for split pane resize
-  const handleSplitDragStart = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    isDraggingSplit.current = true;
-    const container = containerRef.current;
-    if (!container) return;
-
-    const onMove = (ev: MouseEvent) => {
-      if (!isDraggingSplit.current || !container) return;
-      const rect = container.getBoundingClientRect();
-      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      setSplitPos(Math.max(20, Math.min(80, pct)));
-    };
-    const onUp = () => {
-      isDraggingSplit.current = false;
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, []);
+  // Split pane resize is handled by the SplitPane component
 
   return (
     <div className="kasm-app kasm-notes" style={{ flexDirection: 'row' }}>
-      {/* Sidebar - Note list */}
-      <div className="kasm-notes__sidebar" style={{ width: sidebarWidth }}>
-        <div className="kasm-notes__sidebar-header">
-          <span className="kasm-notes__sidebar-title">Notes</span>
-          <div className="kasm-notes__sidebar-actions">
-            <button className="kasm-notes__btn kasm-notes__btn--small" onClick={createNote} title="New note">+</button>
-            <button
-              className="kasm-notes__btn kasm-notes__btn--small kasm-notes__btn--danger"
-              onClick={deleteNote}
-              title="Delete note"
-              disabled={!activeFile}
-            >
-              &times;
-            </button>
-          </div>
-        </div>
-        <div className="kasm-notes__note-list">
-          {notes.map(note => (
-            <button
-              key={note.filename}
-              className={`kasm-notes__note-item ${activeFile === note.filename ? 'kasm-notes__note-item--active' : ''}`}
-              onClick={() => openNote(note.filename)}
-            >
-              <div className="kasm-notes__note-title">{note.title}</div>
-              <div className="kasm-notes__note-date">{note.modified.toLocaleDateString()}</div>
-            </button>
-          ))}
-          {notes.length === 0 && (
-            <div className="kasm-notes__empty">No notes yet</div>
-          )}
-        </div>
-      </div>
-
-      {/* Sidebar resize handle */}
-      <div className="kasm-notes__resize-handle" onMouseDown={handleSidebarDragStart} />
-
-      {/* Main area */}
-      <div className="kasm-notes__main">
-        {/* Toolbar */}
-        <div className="kasm-notes__toolbar">
-          <div className="kasm-notes__toolbar-buttons">
-            {toolbarActions.map(btn => (
+      <SplitPane orientation="horizontal" sizes={[200]} minSizes={[120, 300]}>
+        {/* Sidebar - Note list */}
+        <div className="kasm-notes__sidebar">
+          <div className="kasm-notes__sidebar-header">
+            <span className="kasm-notes__sidebar-title">Notes</span>
+            <div className="kasm-notes__sidebar-actions">
+              <button className="kasm-notes__btn kasm-notes__btn--small" onClick={createNote} title="New note">+</button>
               <button
-                key={btn.title}
-                className="kasm-notes__toolbar-btn"
-                onClick={btn.action}
-                title={btn.title}
+                className="kasm-notes__btn kasm-notes__btn--small kasm-notes__btn--danger"
+                onClick={deleteNote}
+                title="Delete note"
                 disabled={!activeFile}
               >
-                {btn.label}
+                &times;
               </button>
-            ))}
-          </div>
-          <button
-            className="kasm-notes__btn kasm-notes__btn--export"
-            onClick={exportHtml}
-            disabled={!activeFile}
-            title="Export as HTML"
-          >
-            Export HTML
-          </button>
-        </div>
-
-        {/* Editor + Preview split */}
-        <div className="kasm-notes__split" ref={containerRef}>
-          {/* Editor pane */}
-          <div className="kasm-notes__editor-pane" style={{ width: `${splitPos}%` }}>
-            <textarea
-              ref={editorRef}
-              className="kasm-notes__editor"
-              value={content}
-              onChange={e => handleContentChange(e.target.value)}
-              placeholder={activeFile ? 'Start writing markdown...' : 'Select or create a note'}
-              disabled={!activeFile}
-              spellCheck={false}
-            />
-          </div>
-
-          {/* Split drag handle */}
-          <div className="kasm-notes__split-handle" onMouseDown={handleSplitDragStart}>
-            <div className="kasm-notes__split-handle-grip" />
-          </div>
-
-          {/* Preview pane */}
-          <div className="kasm-notes__preview-pane" style={{ width: `${100 - splitPos}%` }}>
-            <div className="kasm-notes__preview-label">Preview</div>
-            <div className="kasm-notes__preview">
-              {previewNodes.map((node, i) => renderMdNode(node, i))}
             </div>
           </div>
+          <div className="kasm-notes__note-list">
+            {notes.map(note => (
+              <button
+                key={note.filename}
+                className={`kasm-notes__note-item ${activeFile === note.filename ? 'kasm-notes__note-item--active' : ''}`}
+                onClick={() => openNote(note.filename)}
+              >
+                <div className="kasm-notes__note-title">{note.title}</div>
+                <div className="kasm-notes__note-date">{note.modified.toLocaleDateString()}</div>
+              </button>
+            ))}
+            {notes.length === 0 && (
+              <div className="kasm-notes__empty">No notes yet</div>
+            )}
+          </div>
         </div>
-      </div>
+
+        {/* Main area */}
+        <div className="kasm-notes__main">
+          {/* Toolbar */}
+          <div className="kasm-notes__toolbar">
+            <div className="kasm-notes__toolbar-buttons">
+              {toolbarActions.map(btn => (
+                <button
+                  key={btn.title}
+                  className="kasm-notes__toolbar-btn"
+                  onClick={btn.action}
+                  title={btn.title}
+                  disabled={!activeFile}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+            <button
+              className="kasm-notes__btn kasm-notes__btn--export"
+              onClick={exportHtml}
+              disabled={!activeFile}
+              title="Export as HTML"
+            >
+              Export HTML
+            </button>
+          </div>
+
+          {/* Editor + Preview split */}
+          <SplitPane orientation="horizontal" minSizes={[200, 200]}>
+            {/* Editor pane */}
+            <div className="kasm-notes__editor-pane">
+              <textarea
+                ref={editorRef}
+                className="kasm-notes__editor"
+                value={content}
+                onChange={e => handleContentChange(e.target.value)}
+                placeholder={activeFile ? 'Start writing markdown...' : 'Select or create a note'}
+                disabled={!activeFile}
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Preview pane */}
+            <div className="kasm-notes__preview-pane">
+              <div className="kasm-notes__preview-label">Preview</div>
+              <div className="kasm-notes__preview">
+                {previewNodes.map((node, i) => renderMdNode(node, i))}
+              </div>
+            </div>
+          </SplitPane>
+        </div>
+      </SplitPane>
 
       <style>{notesStyles}</style>
     </div>
@@ -859,19 +810,6 @@ const notesStyles = `
   font-size: 12px;
 }
 
-/* === Resize handles === */
-.kasm-notes__resize-handle {
-  width: 4px;
-  cursor: col-resize;
-  background: transparent;
-  flex-shrink: 0;
-  transition: background 0.15s;
-}
-
-.kasm-notes__resize-handle:hover {
-  background: var(--kasm-accent);
-}
-
 /* === Main area === */
 .kasm-notes__main {
   flex: 1;
@@ -955,32 +893,6 @@ const notesStyles = `
 
 .kasm-notes__editor::placeholder {
   color: var(--kasm-text-muted, rgba(255,255,255,0.3));
-}
-
-.kasm-notes__split-handle {
-  width: 6px;
-  cursor: col-resize;
-  background: var(--kasm-surface-border);
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.15s;
-}
-
-.kasm-notes__split-handle:hover {
-  background: var(--kasm-accent);
-}
-
-.kasm-notes__split-handle-grip {
-  width: 2px;
-  height: 30px;
-  background: rgba(255,255,255,0.2);
-  border-radius: 1px;
-}
-
-.kasm-notes__split-handle:hover .kasm-notes__split-handle-grip {
-  background: rgba(255,255,255,0.5);
 }
 
 .kasm-notes__preview-pane {
@@ -1173,15 +1085,6 @@ const notesStyles = `
   .kasm-notes__preview-pane {
     width: 100% !important;
     height: 50%;
-  }
-  .kasm-notes__split-handle {
-    width: 100%;
-    height: 6px;
-    cursor: row-resize;
-  }
-  .kasm-notes__split-handle-grip {
-    width: 30px;
-    height: 2px;
   }
   .kasm-notes__toolbar-buttons {
     overflow-x: auto;

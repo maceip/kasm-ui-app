@@ -6,6 +6,7 @@
 
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useDesktopStore } from '../core/store';
+import { SlidingPane } from '../components/SlidingPane';
 import type { Project, AgentSession, AgentBackend, GitNode } from '../core/types';
 import './agentSidebar.css';
 
@@ -127,6 +128,58 @@ export function AgentSidebar() {
           ))}
         </div>
       )}
+
+      {/* Agent detail sliding pane */}
+      <AgentDetailPane
+        agent={project?.agents.find(a => a.id === project?.activeAgentId) ?? null}
+        onClose={() => activeProjectId && setActiveAgent(activeProjectId, '')}
+      />
+    </div>
+  );
+}
+
+function AgentDetailPane({ agent, onClose }: { agent: AgentSession | null; onClose: () => void }) {
+  const brand = agent ? AGENT_BRANDS[agent.backend] : null;
+  return (
+    <SlidingPane
+      isOpen={!!agent}
+      from="left"
+      width="280px"
+      title={agent?.name || ''}
+      subtitle={brand?.label}
+      onRequestClose={onClose}
+    >
+      {agent && (
+        <div style={{ padding: 16, fontSize: 12, color: 'var(--kasm-surface-text)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+            <span style={{ fontSize: 24 }}>{brand?.icon}</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 14 }}>{agent.name}</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--kasm-text-muted)' }}>
+                <StatusDot status={agent.status} />
+                <span>{agent.status}</span>
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <DetailRow label="Backend" value={brand?.label || agent.backend} />
+            <DetailRow label="Branch" value={agent.branch || 'none'} />
+            <DetailRow label="Tokens" value={`${agent.tokensUsed.toLocaleString()}`} />
+            <DetailRow label="Cost" value={`$${agent.costUsd.toFixed(4)}`} />
+            <DetailRow label="Created" value={new Date(agent.createdAt).toLocaleTimeString()} />
+            <DetailRow label="Last active" value={new Date(agent.lastActivity).toLocaleTimeString()} />
+          </div>
+        </div>
+      )}
+    </SlidingPane>
+  );
+}
+
+function DetailRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+      <span style={{ color: 'var(--kasm-text-muted)' }}>{label}</span>
+      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{value}</span>
     </div>
   );
 }

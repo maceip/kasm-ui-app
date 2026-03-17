@@ -6,6 +6,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { SplitPane } from '../layout/SplitPane';
 import { TabPanel, type Tab } from '../layout/TabPanel';
+import { clampSplitPercentages } from '../layout/mosaicUtils';
 import type { AppProps, DockDirection } from '../core/types';
 import './apps.css';
 
@@ -239,7 +240,16 @@ function fixTree(node: LayoutNode): LayoutNode | null {
 
   if (children.length === 0) return null;
   if (children.length === 1) return children[0];
-  return { ...node, children, sizes };
+
+  // Normalize sizes to sum to 100 and enforce minimum pane ratios
+  const total = sizes.reduce((a, b) => a + b, 0) || 1;
+  const pctSizes = sizes.map(s => (s / total) * 100);
+  const clamped = clampSplitPercentages(pctSizes, 5);
+  // Convert back to flex ratios
+  const clampedTotal = clamped.reduce((a, b) => a + b, 0) || 100;
+  const normalizedSizes = clamped.map(s => s / clampedTotal * children.length);
+
+  return { ...node, children, sizes: normalizedSizes };
 }
 
 // ============================================================
