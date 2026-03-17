@@ -185,54 +185,55 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
   );
 }
 
-// --- SVG Logos (inline, 24x24) ---
+// --- SVG Logos from simple-icons (real brand marks, 24x24) ---
 
+// OpenAI "blossom" mark
 const OpenAILogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 2L3.5 7v10L12 22l8.5-5V7L12 2zm0 2.2L18.2 8v8L12 19.8 5.8 16V8L12 4.2z" fill="#10a37f"/>
-    <path d="M12 7.5L8 9.8v4.4l4 2.3 4-2.3V9.8L12 7.5z" fill="#10a37f"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#10a37f" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.2819 9.8211a5.9847 5.9847 0 0 0-.5157-4.9108 6.0462 6.0462 0 0 0-6.5098-2.9A6.0651 6.0651 0 0 0 4.9807 4.1818a5.9847 5.9847 0 0 0-3.9977 2.9 6.0462 6.0462 0 0 0 .7427 7.0966 5.98 5.98 0 0 0 .511 4.9107 6.051 6.051 0 0 0 6.5146 2.9001A5.9847 5.9847 0 0 0 13.2599 24a6.0557 6.0557 0 0 0 5.7718-4.2058 5.9894 5.9894 0 0 0 3.9977-2.9001 6.0557 6.0557 0 0 0-.7475-7.0729zm-9.022 12.6081a4.4755 4.4755 0 0 1-2.8764-1.0408l.1419-.0804 4.7783-2.7582a.7948.7948 0 0 0 .3927-.6813v-6.7369l2.02 1.1686a.071.071 0 0 1 .038.052v5.5826a4.504 4.504 0 0 1-4.4945 4.4944zm-9.6607-4.1254a4.4708 4.4708 0 0 1-.5346-3.0137l.142.0852 4.783 2.7582a.7712.7712 0 0 0 .7806 0l5.8428-3.3685v2.3324a.0804.0804 0 0 1-.0332.0615L9.74 19.9502a4.4992 4.4992 0 0 1-6.1408-1.6464zM2.3408 7.8956a4.485 4.485 0 0 1 2.3655-1.9728V11.6a.7664.7664 0 0 0 .3879.6765l5.8144 3.3543-2.0201 1.1685a.0757.0757 0 0 1-.071 0l-4.8303-2.7865A4.504 4.504 0 0 1 2.3408 7.872zm16.5963 3.8558L13.1038 8.364 15.1192 7.2a.0757.0757 0 0 1 .071 0l4.8303 2.7913a4.4944 4.4944 0 0 1-.6765 8.1042v-5.6772a.79.79 0 0 0-.407-.667zm2.0107-3.0231l-.142-.0852-4.7735-2.7818a.7759.7759 0 0 0-.7854 0L9.409 9.2297V6.8974a.0662.0662 0 0 1 .0284-.0615l4.8303-2.7866a4.4992 4.4992 0 0 1 6.6802 4.66zM8.3065 12.863l-2.02-1.1638a.0804.0804 0 0 1-.038-.0567V6.0742a4.4992 4.4992 0 0 1 7.3757-3.4537l-.142.0805L8.704 5.459a.7948.7948 0 0 0-.3927.6813zm1.0976-2.3654l2.602-1.4998 2.6069 1.4998v2.9994l-2.5974 1.4997-2.6067-1.4997Z"/>
   </svg>
 );
 
+// Anthropic "A" mark
 const AnthropicLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 3L10.5 7.5 6 6l2.5 4.5L4 12l4.5 1.5L6 18l4.5-1.5L12 21l1.5-4.5L18 18l-2.5-4.5L20 12l-4.5-1.5L18 6l-4.5 1.5L12 3z" fill="#d97706" strokeWidth="0"/>
-    <path d="M12 8l-1.2 3.2L7.5 12l3.3 0.8L12 16l1.2-3.2 3.3-0.8-3.3-0.8L12 8z" fill="#f59e0b"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#d97706" xmlns="http://www.w3.org/2000/svg">
+    <path d="M17.3041 3.541h-3.6718l6.696 16.918H24Zm-10.6082 0L0 20.459h3.7442l1.3693-3.5527h7.0052l1.3693 3.5528h3.7442L10.5363 3.5409Zm-.3712 10.2232 2.2914-5.9456 2.2914 5.9456Z"/>
   </svg>
 );
 
+// Google Gemini 4-pointed star
 const GeminiLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 2C12 2 14 8 14 12s-2 10-2 10-2-6-2-10S12 2 12 2z" fill="#4285f4"/>
-    <path d="M2 12c0 0 6-2 10-2s10 2 10 2-6 2-10 2S2 12 2 12z" fill="#4285f4"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#4285f4" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/>
   </svg>
 );
 
+// Cursor cube/hexagon mark
 const CursorLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <rect x="10" y="3" width="4" height="18" rx="2" fill="#a855f7"/>
-    <rect x="7" y="3" width="10" height="3" rx="1" fill="#a855f7" opacity="0.6"/>
-    <rect x="7" y="18" width="10" height="3" rx="1" fill="#a855f7" opacity="0.6"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#a855f7" xmlns="http://www.w3.org/2000/svg">
+    <path d="M11.503.131 1.891 5.678a.84.84 0 0 0-.42.726v11.188c0 .3.162.575.42.724l9.609 5.55a1 1 0 0 0 .998 0l9.61-5.55a.84.84 0 0 0 .42-.724V6.404a.84.84 0 0 0-.42-.726L12.497.131a1.01 1.01 0 0 0-.996 0M2.657 6.338h18.55c.263 0 .43.287.297.515L12.23 22.918c-.062.107-.229.064-.229-.06V12.335a.59.59 0 0 0-.295-.51l-9.11-5.257c-.109-.063-.064-.23.061-.23"/>
   </svg>
 );
 
+// Devin / Cognition - stylized "D" in circle (no simple-icons entry, using brand-accurate representation)
 const DevinLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <circle cx="12" cy="12" r="10" stroke="#06b6d4" strokeWidth="2" fill="none"/>
-    <text x="12" y="16.5" textAnchor="middle" fill="#06b6d4" fontSize="14" fontWeight="bold" fontFamily="sans-serif">D</text>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="12" r="11" fill="#06b6d4"/>
+    <path d="M8.5 7h3.5a5 5 0 0 1 0 10H8.5V7zm2 2v6H12a3 3 0 0 0 0-6h-1.5z" fill="white"/>
   </svg>
 );
 
+// JetBrains mark (angular bracket box)
 const JunieLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M8 4L3 12l5 8" stroke="#e34f82" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
-    <path d="M16 4l5 8-5 8" stroke="#e34f82" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="#e34f82" xmlns="http://www.w3.org/2000/svg">
+    <path d="M2.345 23.997A2.347 2.347 0 0 1 0 21.652V10.988C0 9.665.535 8.37 1.473 7.433l5.965-5.961A5.01 5.01 0 0 1 10.989 0h10.666A2.347 2.347 0 0 1 24 2.345v10.664a5.056 5.056 0 0 1-1.473 3.554l-5.965 5.965A5.017 5.017 0 0 1 13.007 24v-.003H2.345Zm8.969-6.854H5.486v1.371h5.828v-1.371ZM3.963 6.514h13.523v13.519l4.257-4.257a3.936 3.936 0 0 0 1.146-2.767V2.345c0-.678-.552-1.234-1.234-1.234H10.989a3.897 3.897 0 0 0-2.767 1.145L3.963 6.514Zm-.192.192L2.256 8.22a3.944 3.944 0 0 0-1.145 2.768v10.664c0 .678.552 1.234 1.234 1.234h10.666a3.9 3.9 0 0 0 2.767-1.146l1.512-1.511H3.771V6.706Z"/>
   </svg>
 );
 
+// Sourcegraph wildcard mark (no simple-icons, using brand-accurate asterisk representation)
 const CodyLogo = (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-    <path d="M12 2v20M2 12h20M5.5 5.5l13 13M18.5 5.5l-13 13" stroke="#ff5543" strokeWidth="2" strokeLinecap="round"/>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M12 2v8.5M12 13.5V22M2 12h8.5M13.5 12H22M4.93 4.93l6.01 6.01M13.06 13.06l6.01 6.01M19.07 4.93l-6.01 6.01M10.94 13.06l-6.01 6.01" stroke="#ff5543" strokeWidth="2.5" strokeLinecap="round"/>
   </svg>
 );
 
