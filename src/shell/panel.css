@@ -1,0 +1,180 @@
+/* ============================================================
+   Panel Styles - Cinnamon-style taskbar
+   ============================================================ */
+
+.kasm-panel {
+  position: fixed;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  background: var(--kasm-panel-bg);
+  color: var(--kasm-panel-text);
+  border-top: 1px solid var(--kasm-panel-border);
+  z-index: 10000;
+  padding: 0 4px;
+  user-select: none;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.kasm-panel--bottom {
+  bottom: 0;
+}
+
+.kasm-panel--top {
+  top: 0;
+  border-top: none;
+  border-bottom: 1px solid var(--kasm-panel-border);
+}
+
+.kasm-panel__zone {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.kasm-panel__zone--left {
+  flex: 0 0 auto;
+}
+
+.kasm-panel__zone--center {
+  flex: 1 1 auto;
+  overflow: hidden;
+  justify-content: flex-start;
+  padding: 0 8px;
+}
+
+.kasm-panel__zone--right {
+  flex: 0 0 auto;
+  gap: 4px;
+}
+
+/* Panel Button base */
+.kasm-panel-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-panel-text);
+  font-size: var(--kasm-font-size);
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kasm-panel-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kasm-panel-btn--active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.kasm-panel-btn--focused {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+}
+
+.kasm-panel-btn__icon {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* Panel auto-hide animation */
+.kasm-panel {
+  transition: transform 0.25s ease;
+}
+
+.kasm-panel--hidden {
+  /* Visual cue: slightly transparent when sliding away */
+}
+
+/* Trigger strip for revealing hidden panel */
+.kasm-panel-trigger {
+  position: fixed;
+  left: 0;
+  right: 0;
+  height: 4px;
+  z-index: 10001;
+  background: transparent;
+}
+
+.kasm-panel-trigger--bottom {
+  bottom: 0;
+}
+
+.kasm-panel-trigger--top {
+  top: 0;
+}
+
+/* ============================================================
+   Panel - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  .kasm-panel {
+    height: 56px;
+    padding: 0 env(safe-area-inset-right, 4px) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 4px);
+  }
+
+  .kasm-panel-btn {
+    height: 44px;
+    min-width: 44px;
+    padding: 0 8px;
+    gap: 4px;
+    font-size: 12px;
+  }
+
+  .kasm-panel-btn__icon {
+    font-size: 20px;
+  }
+
+  .kasm-panel__zone--center {
+    padding: 0 4px;
+  }
+
+  .kasm-panel__zone {
+    gap: 1px;
+  }
+
+  .kasm-panel__zone--right {
+    gap: 2px;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-panel {
+    height: 48px;
+    padding: 0 4px;
+  }
+
+  .kasm-panel-btn {
+    height: 38px;
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .kasm-panel__zone {
+    gap: 1px;
+  }
+
+  .kasm-panel__zone--center {
+    padding: 0 6px;
+  }
+
+  .kasm-panel__zone--right {
+    gap: 2px;
+  }
+}

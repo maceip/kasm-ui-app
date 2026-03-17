@@ -1,0 +1,90 @@
+.kasm-system-tray {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.kasm-system-tray__expand {
+  width: 20px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-panel-text);
+  font-size: 10px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kasm-system-tray__expand:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kasm-system-tray__icons {
+  display: flex;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.kasm-system-tray__icon {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kasm-system-tray__icon:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* ============================================================
+   System Tray - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) - minimal: hide expand and extra icons */
+@media (max-width: 639px) {
+  .kasm-system-tray {
+    gap: 1px;
+  }
+
+  .kasm-system-tray__expand {
+    display: none;
+  }
+
+  .kasm-system-tray__icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
+  }
+
+  /* Hide non-essential tray icons on mobile; show only battery */
+  .kasm-system-tray__icon:not(.kasm-system-tray__icon--essential) {
+    display: none;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) - show all but compact */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-system-tray {
+    gap: 1px;
+  }
+
+  .kasm-system-tray__expand {
+    width: 18px;
+    height: 24px;
+  }
+
+  .kasm-system-tray__icon {
+    width: 24px;
+    height: 24px;
+    font-size: 13px;
+  }
+}

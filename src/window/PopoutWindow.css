@@ -1,0 +1,53 @@
+/* ============================================================
+   PopoutWindow - Golden Layout browser popout styles
+   ============================================================ */
+
+.kasm-popout-root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.kasm-popout-container {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--kasm-window-bg);
+  color: var(--kasm-window-text);
+  font-family: var(--kasm-font-family);
+}
+
+/* PopoutButton - sits in title bars */
+.kasm-popout-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  transition: background 0.1s, color 0.1s;
+  opacity: 0.7;
+}
+
+.kasm-popout-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  opacity: 1;
+}
+
+.kasm-popout-btn:active {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.kasm-popout-btn__icon {
+  display: block;
+  flex-shrink: 0;
+}

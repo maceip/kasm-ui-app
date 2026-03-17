@@ -1,0 +1,44 @@
+/* ============================================================
+   Desktop Surface
+   ============================================================ */
+
+.kasm-desktop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 48px; /* panel height */
+  background: var(--kasm-desktop-bg);
+  overflow: hidden;
+}
+
+/* Subtle pattern overlay */
+.kasm-desktop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse at 20% 50%, rgba(108, 92, 231, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(0, 180, 216, 0.06) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 80%, rgba(46, 204, 113, 0.04) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ============================================================
+   Desktop - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  .kasm-desktop {
+    bottom: 56px;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-desktop {
+    bottom: 48px;
+  }
+}

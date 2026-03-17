@@ -1,0 +1,249 @@
+/* ============================================================
+   App Menu - Cinnamon-style application launcher
+   ============================================================ */
+
+.kasm-app-menu {
+  position: fixed;
+  bottom: 52px;
+  left: 4px;
+  width: 580px;
+  height: 480px;
+  background: var(--kasm-surface-bg);
+  color: var(--kasm-surface-text);
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: var(--kasm-border-radius);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  z-index: 10001;
+  overflow: hidden;
+  animation: menuSlideIn 0.15s ease-out;
+}
+
+@keyframes menuSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kasm-app-menu__search {
+  padding: 12px;
+  border-bottom: 1px solid var(--kasm-surface-border);
+}
+
+.kasm-app-menu__search-input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 6px;
+  background: var(--kasm-window-bg);
+  color: var(--kasm-window-text);
+  font-size: var(--kasm-font-size);
+  font-family: var(--kasm-font-family);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.kasm-app-menu__search-input:focus {
+  border-color: var(--kasm-accent);
+}
+
+.kasm-app-menu__body {
+  display: flex;
+  flex: 1 1 0;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.kasm-app-menu__categories {
+  width: 140px;
+  flex-shrink: 0;
+  border-right: 1px solid var(--kasm-surface-border);
+  overflow-y: auto;
+  padding: 6px;
+}
+
+.kasm-app-menu__category {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kasm-app-menu__category:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-app-menu__category--active {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+}
+
+.kasm-app-menu__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: min-content;
+  gap: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  align-content: start;
+}
+
+.kasm-app-menu__app {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 8px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 11px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.kasm-app-menu__app:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kasm-app-menu__app-icon {
+  font-size: 28px;
+  line-height: 1;
+}
+
+.kasm-app-menu__app-name {
+  text-align: center;
+  line-height: 1.3;
+}
+
+.kasm-app-menu__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 40px 20px;
+  color: var(--kasm-tab-text);
+  font-size: 13px;
+}
+
+.kasm-app-menu__footer {
+  padding: 8px 12px;
+  border-top: 1px solid var(--kasm-surface-border);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.kasm-app-menu__footer-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--kasm-surface-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+}
+
+.kasm-app-menu__footer-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* ============================================================
+   App Menu - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  .kasm-app-menu {
+    position: fixed;
+    inset: 0;
+    bottom: 56px;
+    width: 100%;
+    height: auto;
+    max-height: 100dvh;
+    border-radius: 0;
+    border: none;
+    animation: none;
+  }
+
+  .kasm-app-menu__search-input {
+    height: 44px;
+    font-size: 16px; /* prevents iOS zoom */
+  }
+
+  .kasm-app-menu__body {
+    flex-direction: column;
+  }
+
+  .kasm-app-menu__categories {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid var(--kasm-surface-border);
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 4px 6px;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+
+  .kasm-app-menu__category {
+    flex-shrink: 0;
+    width: auto;
+    padding: 6px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .kasm-app-menu__grid {
+    grid-template-columns: repeat(2, 1fr);
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .kasm-app-menu__app {
+    padding: 14px 8px;
+  }
+
+  .kasm-app-menu__app-icon {
+    font-size: 32px;
+  }
+
+  .kasm-app-menu__footer {
+    padding: 8px 12px env(safe-area-inset-bottom, 8px);
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-app-menu {
+    width: 400px;
+    height: 420px;
+  }
+
+  .kasm-app-menu__grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .kasm-app-menu__categories {
+    width: 120px;
+  }
+}

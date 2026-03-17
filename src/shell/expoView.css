@@ -1,0 +1,190 @@
+/* ============================================================
+   ExpoView Styles - Expo and Scale view overlays
+   ============================================================ */
+
+.kasm-expo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50000;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transform: scale(1.05);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  pointer-events: none;
+}
+
+.kasm-expo-overlay--active {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+
+.kasm-expo-title {
+  color: var(--kasm-accent-text);
+  font-size: 20px;
+  font-weight: 600;
+  margin: 0 0 20px 0;
+  text-align: center;
+  letter-spacing: 0.5px;
+}
+
+/* === Expo (workspaces) === */
+
+.kasm-expo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90vw;
+  max-height: 80vh;
+}
+
+.kasm-expo-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  justify-content: center;
+}
+
+.kasm-expo-workspace {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.kasm-expo-workspace:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.kasm-expo-workspace--active {
+  outline: 3px solid var(--kasm-accent, #4a9eff);
+  outline-offset: 2px;
+}
+
+.kasm-expo-workspace__preview {
+  width: 200px;
+  height: 130px;
+  background: rgba(40, 40, 50, 0.9);
+  border-radius: 8px 8px 0 0;
+  position: relative;
+  overflow: hidden;
+}
+
+.kasm-expo-workspace__preview--add {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  background: rgba(40, 40, 50, 0.5);
+  border-radius: 8px 8px 0 0;
+}
+
+.kasm-expo-add-icon {
+  font-size: 36px;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 300;
+}
+
+.kasm-expo-workspace--add:hover .kasm-expo-add-icon {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.kasm-expo-miniwindow {
+  position: absolute;
+  border-radius: 3px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.kasm-expo-miniwindow__icon {
+  font-size: 10px;
+  opacity: 0.8;
+}
+
+.kasm-expo-workspace__label {
+  padding: 6px 10px;
+  background: rgba(30, 30, 40, 0.95);
+  color: var(--kasm-text-muted);
+  font-size: 12px;
+  text-align: center;
+  border-radius: 0 0 8px 8px;
+}
+
+/* === Scale (windows) === */
+
+.kasm-scale-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
+}
+
+.kasm-scale-grid {
+  display: grid;
+  gap: 20px;
+  justify-items: center;
+  align-items: center;
+  padding: 10px;
+}
+
+.kasm-scale-window {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 10px;
+  overflow: hidden;
+  width: 240px;
+}
+
+.kasm-scale-window:hover {
+  transform: scale(1.08);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+.kasm-scale-window--focused {
+  outline: 3px solid var(--kasm-accent, #4a9eff);
+  outline-offset: 2px;
+}
+
+.kasm-scale-window__preview {
+  width: 100%;
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px 8px 0 0;
+}
+
+.kasm-scale-window__icon {
+  font-size: 32px;
+  opacity: 0.7;
+}
+
+.kasm-scale-window__title {
+  padding: 8px 10px;
+  background: rgba(30, 30, 40, 0.95);
+  color: var(--kasm-text-muted);
+  font-size: 13px;
+  text-align: center;
+  border-radius: 0 0 8px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kasm-scale-empty {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  grid-column: 1 / -1;
+  padding: 40px;
+}

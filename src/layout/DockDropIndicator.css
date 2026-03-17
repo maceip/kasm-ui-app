@@ -1,0 +1,132 @@
+/* ============================================================
+   DockDropIndicator - rc-dock style drag-to-dock zones
+   ============================================================ */
+
+.kasm-dock-drop {
+  position: absolute;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+}
+
+/* Drop preview overlay - semi-transparent colored rectangle */
+.kasm-dock-drop__preview {
+  position: absolute;
+  background: var(--kasm-accent, #4a9eff);
+  opacity: 0.18;
+  border: 2px solid var(--kasm-accent, #4a9eff);
+  border-radius: 2px;
+  transition: all 0.12s ease-out;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.kasm-dock-drop__preview--center {
+  opacity: 0.12;
+  border-style: dashed;
+}
+
+/* Zone target squares (the small indicator squares users drag onto) */
+.kasm-dock-drop__target {
+  position: absolute;
+  width: 28px;
+  height: 28px;
+  background: var(--kasm-surface-bg, #2a2d32);
+  border: 2px solid var(--kasm-accent, #4a9eff);
+  border-radius: 4px;
+  z-index: 2;
+  pointer-events: all;
+  cursor: default;
+  transition: background 0.1s, transform 0.1s, box-shadow 0.1s;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.kasm-dock-drop__target::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 2px;
+  background: var(--kasm-accent, #4a9eff);
+  opacity: 0.3;
+  transition: opacity 0.1s;
+}
+
+.kasm-dock-drop__target--active {
+  background: var(--kasm-accent, #4a9eff);
+  transform: scale(1.15);
+  box-shadow: 0 2px 12px rgba(74, 158, 255, 0.4);
+}
+
+.kasm-dock-drop__target--active::after {
+  background: white;
+  opacity: 0.6;
+}
+
+/* Center target is slightly larger (like rc-dock's center diamond) */
+.kasm-dock-drop__target--center {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+/* Directional indicator arrows inside targets */
+.kasm-dock-drop__target--left::before,
+.kasm-dock-drop__target--right::before,
+.kasm-dock-drop__target--top::before,
+.kasm-dock-drop__target--bottom::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  z-index: 3;
+}
+
+.kasm-dock-drop__target--left::before {
+  top: 50%;
+  left: 5px;
+  transform: translateY(-50%);
+  border-right: 6px solid var(--kasm-accent, #4a9eff);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.kasm-dock-drop__target--right::before {
+  top: 50%;
+  right: 5px;
+  transform: translateY(-50%);
+  border-left: 6px solid var(--kasm-accent, #4a9eff);
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+}
+
+.kasm-dock-drop__target--top::before {
+  left: 50%;
+  top: 5px;
+  transform: translateX(-50%);
+  border-bottom: 6px solid var(--kasm-accent, #4a9eff);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+.kasm-dock-drop__target--bottom::before {
+  left: 50%;
+  bottom: 5px;
+  transform: translateX(-50%);
+  border-top: 6px solid var(--kasm-accent, #4a9eff);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+}
+
+/* Center target uses a grid icon instead of arrow */
+.kasm-dock-drop__target--center::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--kasm-accent, #4a9eff);
+  border-radius: 2px;
+  z-index: 3;
+}

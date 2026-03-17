@@ -1,0 +1,304 @@
+/* ============================================================
+   Window Styles - Desktop window with title bar and resize
+   ============================================================ */
+
+.kasm-window {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  background: var(--kasm-window-bg);
+  border: 1px solid var(--kasm-window-border);
+  border-radius: var(--kasm-border-radius);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.kasm-window--focused {
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.4);
+  border-color: var(--kasm-accent);
+}
+
+.kasm-window--maximized {
+  border-radius: 0;
+  border: none;
+}
+
+.kasm-window--dragging {
+  opacity: 0.92;
+  transition: none;
+}
+
+.kasm-window__content {
+  flex: 1;
+  overflow: auto;
+  position: relative;
+  min-height: 0;
+}
+
+/* Title Bar */
+.kasm-titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 36px;
+  padding: 0 8px;
+  background: var(--kasm-title-bar-bg);
+  color: var(--kasm-title-bar-text);
+  user-select: none;
+  cursor: grab;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--kasm-window-border);
+}
+
+.kasm-titlebar--focused {
+  background: var(--kasm-title-bar-bg-focused);
+  color: var(--kasm-title-bar-text-focused);
+}
+
+.kasm-titlebar__left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.kasm-titlebar__icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.kasm-titlebar__title {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kasm-titlebar__controls {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex-shrink: 0;
+  margin-right: -8px;
+}
+
+.kasm-titlebar__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-title-bar-text);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.kasm-titlebar--focused .kasm-titlebar__btn {
+  color: var(--kasm-title-bar-text-focused);
+}
+
+.kasm-titlebar__btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.kasm-titlebar__btn--close:hover {
+  background: var(--kasm-danger);
+  color: white;
+}
+
+/* Resize handles */
+.kasm-window__resize {
+  position: absolute;
+  z-index: 1;
+}
+
+.kasm-window__resize--n {
+  top: -3px;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.kasm-window__resize--s {
+  bottom: -3px;
+  left: 6px;
+  right: 6px;
+  height: 6px;
+  cursor: ns-resize;
+}
+
+.kasm-window__resize--e {
+  right: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.kasm-window__resize--w {
+  left: -3px;
+  top: 6px;
+  bottom: 6px;
+  width: 6px;
+  cursor: ew-resize;
+}
+
+.kasm-window__resize--ne {
+  top: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+.kasm-window__resize--nw {
+  top: -3px;
+  left: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.kasm-window__resize--se {
+  bottom: -3px;
+  right: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nwse-resize;
+}
+
+.kasm-window__resize--sw {
+  bottom: -3px;
+  left: -3px;
+  width: 12px;
+  height: 12px;
+  cursor: nesw-resize;
+}
+
+/* Snap preview (Cinnamon) */
+.kasm-snap-preview {
+  position: fixed;
+  background: var(--kasm-snap-preview-bg);
+  border: 2px solid var(--kasm-accent);
+  border-radius: var(--kasm-border-radius);
+  z-index: 9999;
+  pointer-events: none;
+  animation: snapFadeIn 0.1s ease-out;
+}
+
+@keyframes snapFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Global drag/resize states */
+body.kasm-dragging *,
+body.kasm-resizing * {
+  user-select: none !important;
+}
+
+body.kasm-dragging iframe,
+body.kasm-resizing iframe {
+  pointer-events: none !important;
+}
+
+/* ============================================================
+   Window - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  .kasm-window {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: calc(100% - 56px) !important;
+    border-radius: 0;
+    border: none;
+    box-shadow: none;
+  }
+
+  .kasm-window--focused {
+    box-shadow: none;
+    border: none;
+  }
+
+  .kasm-titlebar {
+    height: 44px;
+    padding: 0 4px;
+    cursor: default;
+  }
+
+  .kasm-titlebar__btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  /* Hide minimize and maximize on mobile - only close */
+  .kasm-titlebar__btn--minimize,
+  .kasm-titlebar__btn--maximize {
+    display: none;
+  }
+
+  /* Hide all resize handles on mobile */
+  .kasm-window__resize {
+    display: none;
+  }
+
+  .kasm-snap-preview {
+    display: none;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-window {
+    border-radius: 6px;
+  }
+
+  .kasm-window--maximized {
+    border-radius: 0;
+  }
+
+  /* Half-screen snap support */
+  .kasm-window--snapped-left {
+    position: absolute;
+    left: 0 !important;
+    top: 0 !important;
+    width: 50% !important;
+    height: 100% !important;
+    border-radius: 0;
+  }
+
+  .kasm-window--snapped-right {
+    position: absolute;
+    left: 50% !important;
+    top: 0 !important;
+    width: 50% !important;
+    height: 100% !important;
+    border-radius: 0;
+  }
+
+  /* Hide corner resize handles, keep edge handles only */
+  .kasm-window__resize--ne,
+  .kasm-window__resize--nw,
+  .kasm-window__resize--se,
+  .kasm-window__resize--sw {
+    display: none;
+  }
+
+  .kasm-titlebar {
+    height: 36px;
+  }
+
+  .kasm-titlebar__btn {
+    width: 36px;
+    height: 36px;
+  }
+}

@@ -1,0 +1,16 @@
+/* ============================================================
+   HotCorners Styles - Invisible trigger zones at screen corners
+   ============================================================ */
+
+.kasm-hot-corner {
+  position: fixed;
+  z-index: 99999;
+  background: transparent;
+  pointer-events: auto;
+  transition: background 0.15s ease;
+}
+
+.kasm-hot-corner--flash {
+  background: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 12px 4px rgba(255, 255, 255, 0.2);
+}

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <rect width="390" height="844" fill="#0a0a1a"/>
+  <ellipse cx="195" cy="400" rx="300" ry="300" fill="rgba(108,92,231,0.06)"/>
+  <!-- Mobile window -->
+  <rect x="8" y="8" width="374" height="784" rx="8" fill="#1e1e2e" stroke="#333355"/>
+  <rect x="8" y="8" width="374" height="36" rx="8" fill="#16162a"/>
+  <text x="24" y="32" fill="#e0e0e0" font-size="12" font-family="system-ui">Terminal</text>
+  <!-- Panel -->
+  <rect x="0" y="796" width="390" height="48" fill="#1a1a2e"/>
+  <text x="16" y="826" fill="#e0e0e0" font-size="12" font-family="system-ui">Apps</text>
+</svg>

@@ -1,0 +1,120 @@
+/* ============================================================
+   Global Styles - Kasm UI Desktop Environment
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--kasm-font-family);
+  font-size: var(--kasm-font-size);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  background: var(--kasm-desktop-bg, #000);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--kasm-scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--kasm-scrollbar-thumb);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--kasm-splitter-hover);
+}
+
+/* Selection */
+::selection {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+}
+
+/* Focus visible */
+:focus-visible {
+  outline: 2px solid var(--kasm-accent);
+  outline-offset: 2px;
+}
+
+/* Input base */
+input, textarea, select, button {
+  font-family: var(--kasm-font-family);
+}
+
+/* Range input */
+input[type="range"] {
+  accent-color: var(--kasm-accent);
+}
+
+/* ============================================================
+   Responsive Viewport Support
+   ============================================================ */
+
+/* Viewport-fit for notch devices */
+@viewport {
+  viewport-fit: cover;
+}
+
+html {
+  padding:
+    env(safe-area-inset-top)
+    env(safe-area-inset-right)
+    env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+}
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  html, body, #root {
+    height: 100dvh;
+    overflow: hidden;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  :focus-visible {
+    outline-offset: -2px;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  html, body, #root {
+    height: 100dvh;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* Foldable screen spanning */
+@media (horizontal-viewport-segments: 2) {
+  .kasm-desktop {
+    column-gap: env(viewport-segment-width 0 0, 0px);
+  }
+}

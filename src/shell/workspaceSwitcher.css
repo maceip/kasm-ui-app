@@ -1,0 +1,72 @@
+.kasm-workspace-switcher {
+  display: flex;
+  gap: 2px;
+  padding: 0 4px;
+}
+
+.kasm-workspace-switcher__item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--kasm-panel-text);
+  font-size: 11px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.kasm-workspace-switcher__item:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.kasm-workspace-switcher__item--active {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+  border-color: var(--kasm-accent);
+}
+
+.kasm-workspace-switcher__index {
+  font-weight: 600;
+}
+
+.kasm-workspace-switcher__dot {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* ============================================================
+   Workspace Switcher - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) - hide completely */
+@media (max-width: 639px) {
+  .kasm-workspace-switcher {
+    display: none;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) - compact */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-workspace-switcher {
+    gap: 1px;
+    padding: 0 2px;
+  }
+
+  .kasm-workspace-switcher__item {
+    width: 24px;
+    height: 24px;
+    font-size: 10px;
+  }
+}

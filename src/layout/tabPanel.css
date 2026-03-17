@@ -1,0 +1,108 @@
+/* ============================================================
+   TabPanel - Golden Layout themed tabs
+   ============================================================ */
+
+.kasm-tab-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.kasm-tab-panel__header {
+  display: flex;
+  align-items: stretch;
+  background: var(--kasm-tab-bg);
+  border-bottom: 1px solid var(--kasm-surface-border);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.kasm-tab-panel__tabs {
+  display: flex;
+  overflow-x: auto;
+  flex: 1;
+  gap: 0;
+  scrollbar-width: none;
+}
+
+.kasm-tab-panel__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.kasm-tab-panel__tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  height: 34px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-tab-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+  border-right: 1px solid var(--kasm-surface-border);
+  border-bottom: 2px solid transparent;
+  border-left: 2px solid transparent;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.kasm-tab-panel__tab:hover {
+  background: var(--kasm-tab-hover-bg);
+}
+
+.kasm-tab-panel__tab--active {
+  background: var(--kasm-tab-active-bg);
+  color: var(--kasm-tab-active-text);
+  border-bottom-color: var(--kasm-accent);
+}
+
+.kasm-tab-panel__tab--drag-over {
+  border-left-color: var(--kasm-accent);
+}
+
+.kasm-tab-panel__tab-icon {
+  font-size: 13px;
+}
+
+.kasm-tab-panel__tab-title {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kasm-tab-panel__tab-close {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  opacity: 0;
+  transition: opacity 0.1s, background 0.1s;
+  line-height: 1;
+}
+
+.kasm-tab-panel__tab:hover .kasm-tab-panel__tab-close {
+  opacity: 0.6;
+}
+
+.kasm-tab-panel__tab-close:hover {
+  opacity: 1 !important;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.kasm-tab-panel__content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kasm-tab-panel__pane {
+  height: 100%;
+}

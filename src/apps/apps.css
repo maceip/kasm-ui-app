@@ -1,0 +1,829 @@
+/* ============================================================
+   App Styles - Shared styles for built-in applications
+   ============================================================ */
+
+.kasm-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--kasm-font-family);
+  font-size: var(--kasm-font-size);
+  color: var(--kasm-window-text);
+  background: var(--kasm-window-bg);
+}
+
+/* === Text Editor === */
+.kasm-text-editor__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  background: var(--kasm-surface-bg);
+  border-bottom: 1px solid var(--kasm-surface-border);
+  font-size: 12px;
+}
+
+.kasm-text-editor__filename {
+  font-weight: 600;
+}
+
+.kasm-text-editor__info {
+  opacity: 0.6;
+}
+
+.kasm-text-editor__body {
+  display: flex;
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kasm-text-editor__gutter {
+  width: 40px;
+  flex-shrink: 0;
+  padding: 8px 0;
+  background: var(--kasm-surface-bg);
+  border-right: 1px solid var(--kasm-surface-border);
+  text-align: right;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--kasm-tab-text);
+  user-select: none;
+}
+
+.kasm-text-editor__line-number {
+  padding-right: 8px;
+}
+
+.kasm-text-editor__textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 8px 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  tab-size: 2;
+  background: var(--kasm-window-bg);
+  color: var(--kasm-window-text);
+}
+
+/* === File Manager === */
+.kasm-fm__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--kasm-surface-bg);
+  border-bottom: 1px solid var(--kasm-surface-border);
+}
+
+.kasm-fm__nav-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.kasm-fm__nav-btn:disabled {
+  opacity: 0.3;
+}
+
+.kasm-fm__breadcrumbs {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  overflow: hidden;
+}
+
+.kasm-fm__breadcrumb {
+  border: none;
+  background: transparent;
+  color: var(--kasm-accent);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.kasm-fm__breadcrumb:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-fm__separator {
+  opacity: 0.3;
+  margin: 0 2px;
+}
+
+.kasm-fm__search {
+  width: 160px;
+  height: 26px;
+  padding: 0 8px;
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 4px;
+  background: var(--kasm-window-bg);
+  color: var(--kasm-window-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  outline: none;
+}
+
+.kasm-fm__search:focus {
+  border-color: var(--kasm-accent);
+}
+
+.kasm-fm__view-toggle {
+  display: flex;
+  gap: 2px;
+}
+
+.kasm-fm__view-toggle button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--kasm-surface-border);
+  background: transparent;
+  color: var(--kasm-surface-text);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.kasm-fm__view-toggle button.active {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+  border-color: var(--kasm-accent);
+}
+
+.kasm-fm__content {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+
+.kasm-fm__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.kasm-fm__table th {
+  text-align: left;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--kasm-surface-border);
+  background: var(--kasm-surface-bg);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+}
+
+.kasm-fm__table td {
+  padding: 5px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.kasm-fm__table tr:hover td {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.kasm-fm__file-icon {
+  margin-right: 6px;
+}
+
+.kasm-fm__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.kasm-fm__grid-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.kasm-fm__grid-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-fm__grid-icon {
+  font-size: 28px;
+}
+
+.kasm-fm__grid-name {
+  font-size: 11px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.kasm-fm__empty {
+  text-align: center;
+  padding: 40px;
+  opacity: 0.5;
+}
+
+.kasm-fm__statusbar {
+  padding: 4px 12px;
+  font-size: 11px;
+  opacity: 0.6;
+  border-top: 1px solid var(--kasm-surface-border);
+  background: var(--kasm-surface-bg);
+}
+
+/* === Terminal === */
+.kasm-terminal {
+  background: var(--kasm-terminal-bg);
+  color: var(--kasm-terminal-fg);
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  cursor: text;
+}
+
+.kasm-terminal__output {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.kasm-terminal__line {
+  line-height: 1.6;
+}
+
+.kasm-terminal__line--input {
+  color: var(--kasm-accent);
+}
+
+.kasm-terminal__line--error {
+  color: var(--kasm-danger);
+}
+
+.kasm-terminal__prompt {
+  display: flex;
+  align-items: center;
+  padding: 4px 12px 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.kasm-terminal__prompt-text {
+  color: var(--kasm-accent);
+  font-weight: bold;
+  margin-right: 8px;
+}
+
+.kasm-terminal__input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--kasm-terminal-fg);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* === Settings === */
+.kasm-settings {
+  flex-direction: row;
+}
+
+.kasm-settings__sidebar {
+  width: 160px;
+  flex-shrink: 0;
+  background: var(--kasm-surface-bg);
+  border-right: 1px solid var(--kasm-surface-border);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kasm-settings__nav-item {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 13px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kasm-settings__nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-settings__nav-item--active {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+}
+
+.kasm-settings__content {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.kasm-settings__section h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kasm-settings__section h3:not(:first-child) {
+  margin-top: 20px;
+}
+
+.kasm-settings__theme-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.kasm-settings__theme-card {
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: var(--kasm-surface-bg);
+  padding: 8px;
+  cursor: pointer;
+  text-align: center;
+  color: var(--kasm-surface-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+}
+
+.kasm-settings__theme-card--active {
+  border-color: var(--kasm-accent);
+}
+
+.kasm-settings__theme-preview {
+  height: 60px;
+  border-radius: 4px;
+  margin-bottom: 8px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.kasm-settings__option-group {
+  display: flex;
+  gap: 16px;
+}
+
+.kasm-settings__radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.kasm-settings__workspace-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kasm-settings__workspace-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background: var(--kasm-surface-bg);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.kasm-settings__workspace-count {
+  opacity: 0.5;
+  flex: 1;
+}
+
+.kasm-settings__workspace-remove {
+  border: none;
+  background: transparent;
+  color: var(--kasm-tab-text);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 4px;
+}
+
+.kasm-settings__workspace-remove:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.kasm-settings__add-btn {
+  margin-top: 12px;
+  padding: 8px 16px;
+  border: 1px dashed var(--kasm-surface-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-accent);
+  cursor: pointer;
+  font-size: 13px;
+  font-family: var(--kasm-font-family);
+}
+
+.kasm-settings__about h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.kasm-settings__about p {
+  margin: 0 0 16px;
+  opacity: 0.7;
+}
+
+.kasm-settings__about-grid {
+  display: grid;
+  grid-template-columns: auto auto;
+  gap: 4px 20px;
+  font-size: 13px;
+}
+
+.kasm-settings__about-grid span:nth-child(odd) {
+  opacity: 0.6;
+}
+
+/* === Collab Editor === */
+.kasm-collab-editor__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  background: var(--kasm-surface-bg);
+  border-bottom: 1px solid var(--kasm-surface-border);
+  font-size: 12px;
+}
+
+.kasm-collab-editor__status {
+  color: var(--kasm-success);
+}
+
+.kasm-collab-editor__version,
+.kasm-collab-editor__client {
+  opacity: 0.5;
+}
+
+.kasm-collab-editor__textarea {
+  flex: 1;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: var(--kasm-window-bg);
+  color: var(--kasm-window-text);
+}
+
+.kasm-collab-editor__footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 11px;
+  opacity: 0.5;
+  border-top: 1px solid var(--kasm-surface-border);
+  background: var(--kasm-surface-bg);
+}
+
+/* === System Monitor === */
+.kasm-sysmon {
+  padding: 12px;
+  gap: 12px;
+  overflow-y: auto;
+}
+
+.kasm-sysmon__metric {
+  background: var(--kasm-surface-bg);
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid var(--kasm-surface-border);
+}
+
+.kasm-sysmon__metric-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.kasm-sysmon__metric-label {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.kasm-sysmon__metric-value {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kasm-sysmon__graph {
+  width: 100%;
+  height: 80px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.kasm-sysmon__metric-sub {
+  font-size: 11px;
+  opacity: 0.5;
+  margin-bottom: 6px;
+}
+
+.kasm-sysmon__tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--kasm-surface-border);
+  margin: -12px -12px 12px;
+  padding: 0;
+}
+
+.kasm-sysmon__tab {
+  flex: 1;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 13px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+}
+
+.kasm-sysmon__tab--active {
+  border-bottom-color: var(--kasm-accent);
+  color: var(--kasm-accent);
+}
+
+.kasm-sysmon__graphs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.kasm-sysmon__processes {
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kasm-sysmon__proc-header {
+  display: flex;
+  padding: 6px 8px;
+  font-weight: 600;
+  border-bottom: 1px solid var(--kasm-surface-border);
+  opacity: 0.7;
+}
+
+.kasm-sysmon__proc-row {
+  display: flex;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.kasm-sysmon__proc-row:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* === Calculator === */
+.kasm-calculator {
+  max-width: 260px;
+  margin: 0 auto;
+  padding: 8px;
+  gap: 8px;
+}
+
+.kasm-calc__display {
+  background: var(--kasm-surface-bg);
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 28px;
+  font-weight: 300;
+  text-align: right;
+  font-family: 'JetBrains Mono', monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-height: 48px;
+}
+
+.kasm-calc__buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kasm-calc__row {
+  display: flex;
+  gap: 4px;
+}
+
+.kasm-calc__btn {
+  flex: 1;
+  height: 44px;
+  border: none;
+  border-radius: 8px;
+  background: var(--kasm-surface-bg);
+  color: var(--kasm-surface-text);
+  font-size: 16px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.kasm-calc__btn:hover {
+  filter: brightness(1.2);
+}
+
+.kasm-calc__btn:active {
+  filter: brightness(0.9);
+}
+
+.kasm-calc__btn--op {
+  background: var(--kasm-accent);
+  color: var(--kasm-accent-text);
+}
+
+.kasm-calc__btn--func {
+  background: var(--kasm-surface-border);
+}
+
+.kasm-calc__btn--wide {
+  flex: 2;
+}
+
+/* === Docking Demo === */
+.kasm-docking-demo {
+  overflow: hidden;
+}
+
+.kasm-dock-panel-content {
+  height: 100%;
+  overflow: auto;
+}
+
+.kasm-dock-tree__item {
+  padding: 4px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.kasm-dock-tree__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ============================================================
+   Apps - Responsive
+   ============================================================ */
+
+/* Mobile (< 640px) */
+@media (max-width: 639px) {
+  /* Terminal */
+  .kasm-terminal {
+    font-size: 12px;
+  }
+
+  .kasm-terminal__output {
+    padding: 6px 8px;
+  }
+
+  .kasm-terminal__prompt {
+    padding: 4px 8px 6px;
+  }
+
+  /* Settings - sidebar becomes top tabs */
+  .kasm-settings {
+    flex-direction: column;
+  }
+
+  .kasm-settings__sidebar {
+    width: 100%;
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-right: none;
+    border-bottom: 1px solid var(--kasm-surface-border);
+    padding: 4px 6px;
+    gap: 4px;
+  }
+
+  .kasm-settings__nav-item {
+    flex-shrink: 0;
+    white-space: nowrap;
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .kasm-settings__content {
+    padding: 12px;
+  }
+
+  .kasm-settings__theme-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+  }
+
+  /* Calculator - fit screen */
+  .kasm-calculator {
+    max-width: 100%;
+    padding: 6px;
+  }
+
+  .kasm-calc__display {
+    font-size: 24px;
+    padding: 10px 12px;
+  }
+
+  .kasm-calc__btn {
+    height: 48px;
+    font-size: 18px;
+  }
+
+  /* File Manager */
+  .kasm-fm__toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 4px 8px;
+  }
+
+  .kasm-fm__search {
+    width: 100%;
+    order: 10;
+  }
+
+  .kasm-fm__grid {
+    grid-template-columns: repeat(auto-fill, minmax(75px, 1fr));
+    gap: 6px;
+    padding: 8px;
+  }
+
+  /* Text Editor */
+  .kasm-text-editor__textarea {
+    font-size: 12px;
+    padding: 6px 8px;
+  }
+
+  .kasm-text-editor__gutter {
+    width: 32px;
+    font-size: 10px;
+  }
+
+  /* System Monitor */
+  .kasm-sysmon {
+    padding: 8px;
+    gap: 8px;
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px) */
+@media (min-width: 640px) and (max-width: 1023px) {
+  /* Terminal */
+  .kasm-terminal {
+    font-size: 13px;
+  }
+
+  /* Settings */
+  .kasm-settings__sidebar {
+    width: 140px;
+  }
+
+  .kasm-settings__content {
+    padding: 16px;
+  }
+
+  .kasm-settings__theme-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
+
+  /* Calculator */
+  .kasm-calculator {
+    max-width: 240px;
+  }
+
+  /* File Manager */
+  .kasm-fm__search {
+    width: 140px;
+  }
+
+  .kasm-fm__grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+  }
+}
