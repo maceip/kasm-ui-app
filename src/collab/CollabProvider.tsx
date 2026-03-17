@@ -55,6 +55,16 @@ export function CollabProvider({ children }: { children: React.ReactNode }) {
     return conn;
   }, [clientId]);
 
+  // Disconnect on unmount to prevent leaked WebSocket connections
+  useEffect(() => {
+    return () => {
+      if (connectionRef.current) {
+        connectionRef.current.disconnect();
+        connectionRef.current = null;
+      }
+    };
+  }, []);
+
   const getDoc = useCallback(<T,>(collection: string, docId: string, initial: T): CollabDoc<T> => {
     const key = `${collection}:${docId}`;
     if (!docs.has(key)) {

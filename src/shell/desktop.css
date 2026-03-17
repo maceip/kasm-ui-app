@@ -7,10 +7,15 @@
   top: 0;
   left: 240px; /* agent sidebar width */
   right: 0;
-  bottom: 48px; /* panel height */
+  bottom: var(--kasm-panel-h, 48px);
   background: var(--kasm-desktop-bg);
   overflow: hidden;
   transition: left 0.2s ease;
+}
+
+[data-panel-position="top"] .kasm-desktop {
+  top: var(--kasm-panel-h, 48px);
+  bottom: 0;
 }
 
 /* When sidebar is collapsed */

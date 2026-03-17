@@ -6,6 +6,28 @@
 import { useEffect, useRef } from 'react';
 import { useDesktopStore } from './store';
 import { appRegistry } from '../apps/registry';
+import type { PanelPosition, WindowState } from './types';
+
+const VALID_POSITIONS: PanelPosition[] = ['top', 'bottom', 'left', 'right'];
+const VALID_AUTOHIDE = ['never', 'always', 'intellihide'] as const;
+const VALID_WINDOW_STATES: WindowState['state'][] = [
+  'normal', 'minimized', 'maximized',
+  'snapped-left', 'snapped-right',
+  'snapped-top-left', 'snapped-top-right',
+  'snapped-bottom-left', 'snapped-bottom-right',
+];
+
+function isValidPosition(v: string): v is PanelPosition {
+  return (VALID_POSITIONS as string[]).includes(v);
+}
+
+function isValidAutohide(v: string): v is (typeof VALID_AUTOHIDE)[number] {
+  return (VALID_AUTOHIDE as readonly string[]).includes(v);
+}
+
+function isValidWindowState(v: string): v is WindowState['state'] {
+  return (VALID_WINDOW_STATES as string[]).includes(v);
+}
 
 const STORAGE_KEY = 'kasm-ui-layout';
 const DEBOUNCE_MS = 2000;
@@ -119,10 +141,12 @@ export function loadLayout(): void {
 
     // Restore panel config (partial - keep applets from default)
     if (layout.panelConfig) {
+      const pos = layout.panelConfig.position;
+      const ah = layout.panelConfig.autohide;
       state.setPanelConfig({
-        position: layout.panelConfig.position as any,
+        ...(isValidPosition(pos) ? { position: pos } : {}),
         height: layout.panelConfig.height,
-        autohide: layout.panelConfig.autohide as any,
+        ...(isValidAutohide(ah) ? { autohide: ah } : {}),
       });
     }
 
@@ -145,7 +169,7 @@ export function loadLayout(): void {
           maxWidth: savedWindow.maxWidth,
           maxHeight: savedWindow.maxHeight,
           zIndex: savedWindow.zIndex,
-          state: savedWindow.state as any,
+          state: isValidWindowState(savedWindow.state) ? savedWindow.state : 'normal',
           focused: savedWindow.focused,
           resizable: savedWindow.resizable,
           closable: savedWindow.closable,

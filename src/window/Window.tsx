@@ -4,7 +4,7 @@
 // Cinnamon's window management, Re-Flex's resize constraints
 // ============================================================
 
-import { useRef, useCallback, useState, useEffect } from 'react';
+import { useRef, useCallback, useState, useEffect, memo } from 'react';
 import { useDesktopStore } from '../core/store';
 import { TitleBar } from './TitleBar';
 import { PopoutWindow } from './PopoutWindow';
@@ -18,12 +18,11 @@ interface WindowProps {
 
 type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null;
 
-export function Window({ win, children }: WindowProps) {
-  const { focusWindow, moveWindow, resizeWindow, snapWindow, maximizeWindow, restoreWindow } = useDesktopStore();
+export const Window = memo(function Window({ win, children }: WindowProps) {
   const [poppedOut, setPoppedOut] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState<ResizeDir>(null);
-  const [snapPreview, setSnapPreview] = useState<SnapZone>(null);
+  const [snapPreview, setSnapPreview] = useState<SnapZone | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0, wx: 0, wy: 0 });
   const windowRef = useRef<HTMLDivElement>(null);
@@ -33,6 +32,7 @@ export function Window({ win, children }: WindowProps) {
 
   // --- Drag (title bar) ---
   const onDragStart = useCallback((e: React.MouseEvent) => {
+    const { focusWindow, restoreWindow } = useDesktopStore.getState();
     if (isMaximized) {
       // Unmaximize on drag
       restoreWindow(win.id);
@@ -44,7 +44,7 @@ export function Window({ win, children }: WindowProps) {
     setDragging(true);
     focusWindow(win.id);
     e.preventDefault();
-  }, [win.id, win.x, win.y, isMaximized, focusWindow, restoreWindow]);
+  }, [win.id, win.x, win.y, isMaximized]);
 
   useEffect(() => {
     if (!dragging) return;
@@ -52,7 +52,7 @@ export function Window({ win, children }: WindowProps) {
     const onMove = (e: MouseEvent) => {
       const x = e.clientX - dragOffset.current.x;
       const y = e.clientY - dragOffset.current.y;
-      moveWindow(win.id, Math.max(0, x), Math.max(0, y));
+      useDesktopStore.getState().moveWindow(win.id, Math.max(0, x), Math.max(0, y));
 
       // Snap zone detection (Cinnamon-style edge snapping)
       const zone = detectSnapZone(e.clientX, e.clientY);
@@ -63,7 +63,7 @@ export function Window({ win, children }: WindowProps) {
       setDragging(false);
       const zone = detectSnapZone(e.clientX, e.clientY);
       if (zone) {
-        snapWindow(win.id, zone);
+        useDesktopStore.getState().snapWindow(win.id, zone);
       }
       setSnapPreview(null);
     };
@@ -79,7 +79,7 @@ export function Window({ win, children }: WindowProps) {
       document.body.style.cursor = '';
       document.body.classList.remove('kasm-dragging');
     };
-  }, [dragging, win.id, moveWindow, snapWindow]);
+  }, [dragging, win.id]);
 
   // --- Resize (Re-Flex constraint-aware) ---
   const onResizeStart = useCallback((dir: ResizeDir, e: React.MouseEvent) => {
@@ -90,10 +90,10 @@ export function Window({ win, children }: WindowProps) {
       w: win.width, h: win.height,
       wx: win.x, wy: win.y,
     };
-    focusWindow(win.id);
+    useDesktopStore.getState().focusWindow(win.id);
     e.preventDefault();
     e.stopPropagation();
-  }, [win.id, win.width, win.height, win.x, win.y, win.resizable, focusWindow]);
+  }, [win.id, win.width, win.height, win.x, win.y, win.resizable]);
 
   useEffect(() => {
     if (!resizing) return;
@@ -114,9 +114,9 @@ export function Window({ win, children }: WindowProps) {
       newH = Math.max(win.minHeight, Math.min(newH, win.maxHeight ?? Infinity));
 
       if (newX !== s.wx || newY !== s.wy) {
-        moveWindow(win.id, Math.max(0, newX), Math.max(0, newY));
+        useDesktopStore.getState().moveWindow(win.id, Math.max(0, newX), Math.max(0, newY));
       }
-      resizeWindow(win.id, newW, newH);
+      useDesktopStore.getState().resizeWindow(win.id, newW, newH);
     };
 
     const onUp = () => setResizing(null);
@@ -133,16 +133,17 @@ export function Window({ win, children }: WindowProps) {
       document.body.style.cursor = '';
       document.body.classList.remove('kasm-resizing');
     };
-  }, [resizing, win.id, win.minWidth, win.minHeight, win.maxWidth, win.maxHeight, moveWindow, resizeWindow]);
+  }, [resizing, win.id, win.minWidth, win.minHeight, win.maxWidth, win.maxHeight]);
 
   // Double-click title to maximize/restore
   const onTitleDoubleClick = useCallback(() => {
+    const { maximizeWindow, restoreWindow } = useDesktopStore.getState();
     if (isMaximized) {
       restoreWindow(win.id);
     } else {
       maximizeWindow(win.id);
     }
-  }, [win.id, isMaximized, maximizeWindow, restoreWindow]);
+  }, [win.id, isMaximized]);
 
   if (isMinimized) return null;
 
@@ -180,7 +181,7 @@ export function Window({ win, children }: WindowProps) {
           height: win.height,
           zIndex: win.zIndex,
         }}
-        onMouseDown={() => focusWindow(win.id)}
+        onMouseDown={() => useDesktopStore.getState().focusWindow(win.id)}
       >
         <TitleBar
           win={win}
@@ -208,7 +209,7 @@ export function Window({ win, children }: WindowProps) {
       </div>
     </>
   );
-}
+});
 
 // Cinnamon snap zone detection
 function detectSnapZone(mouseX: number, mouseY: number): SnapZone {

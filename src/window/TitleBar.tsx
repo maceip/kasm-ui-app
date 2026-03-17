@@ -4,6 +4,7 @@
 // Golden Layout's header controls, rc-dock's panel header
 // ============================================================
 
+import { memo } from 'react';
 import { useDesktopStore } from '../core/store';
 import { PopoutButton } from './PopoutWindow';
 import type { WindowState } from '../core/types';
@@ -15,8 +16,7 @@ interface TitleBarProps {
   onPopout?: () => void;
 }
 
-export function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBarProps) {
-  const { closeWindow, minimizeWindow, maximizeWindow, restoreWindow } = useDesktopStore();
+export const TitleBar = memo(function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBarProps) {
   const isMaximized = win.state === 'maximized' || win.state.startsWith('snapped');
 
   return (
@@ -34,7 +34,7 @@ export function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBar
         {win.minimizable && (
           <button
             className="kasm-titlebar__btn kasm-titlebar__btn--minimize"
-            onClick={() => minimizeWindow(win.id)}
+            onClick={() => useDesktopStore.getState().minimizeWindow(win.id)}
             title="Minimize"
           >
             <svg width="10" height="10" viewBox="0 0 10 10">
@@ -45,7 +45,7 @@ export function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBar
         {win.maximizable && (
           <button
             className="kasm-titlebar__btn kasm-titlebar__btn--maximize"
-            onClick={() => isMaximized ? restoreWindow(win.id) : maximizeWindow(win.id)}
+            onClick={() => isMaximized ? useDesktopStore.getState().restoreWindow(win.id) : useDesktopStore.getState().maximizeWindow(win.id)}
             title={isMaximized ? 'Restore' : 'Maximize'}
           >
             {isMaximized ? (
@@ -69,7 +69,7 @@ export function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBar
         {win.closable && (
           <button
             className="kasm-titlebar__btn kasm-titlebar__btn--close"
-            onClick={() => closeWindow(win.id)}
+            onClick={() => useDesktopStore.getState().closeWindow(win.id)}
             title="Close"
           >
             <svg width="10" height="10" viewBox="0 0 10 10">
@@ -81,4 +81,4 @@ export function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBar
       </div>
     </div>
   );
-}
+});

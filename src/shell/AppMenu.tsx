@@ -10,7 +10,8 @@ import { LiquidGlass } from '../components/LiquidGlass';
 import './appMenu.css';
 
 export function AppMenuButton() {
-  const { appMenuOpen, toggleAppMenu } = useDesktopStore();
+  const appMenuOpen = useDesktopStore(s => s.appMenuOpen);
+  const toggleAppMenu = useDesktopStore(s => s.toggleAppMenu);
 
   return (
     <LiquidGlass
@@ -36,7 +37,9 @@ export function AppMenuButton() {
 }
 
 export function AppMenu() {
-  const { appMenuOpen, closeAppMenu, createWindow } = useDesktopStore();
+  const appMenuOpen = useDesktopStore(s => s.appMenuOpen);
+  const closeAppMenu = useDesktopStore(s => s.closeAppMenu);
+  const createWindow = useDesktopStore(s => s.createWindow);
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState('all');
   const searchRef = useRef<HTMLInputElement>(null);

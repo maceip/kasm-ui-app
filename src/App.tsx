@@ -31,18 +31,10 @@ export default function App() {
     return stop;
   }, []);
 
-  // Adjust desktop bounds when panel position changes
+  // Expose panel config as CSS custom properties / data attributes
   useEffect(() => {
-    const desktop = document.querySelector('.kasm-desktop') as HTMLElement;
-    if (!desktop) return;
-
-    if (panelConfig.position === 'top') {
-      desktop.style.top = `${panelConfig.height}px`;
-      desktop.style.bottom = '0';
-    } else {
-      desktop.style.top = '0';
-      desktop.style.bottom = `${panelConfig.height}px`;
-    }
+    document.documentElement.dataset.panelPosition = panelConfig.position;
+    document.documentElement.style.setProperty('--kasm-panel-h', `${panelConfig.height}px`);
   }, [panelConfig.position, panelConfig.height]);
 
   // Welcome notification on first load

@@ -51,6 +51,9 @@ export function SplitPane({
   const dragIndex = useRef(-1);
   const dragStart = useRef(0);
   const sizesAtDragStart = useRef<number[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
+  const sizesRef = useRef(sizes);
+  sizesRef.current = sizes;
 
   // Convert flex ratios to pixel sizes and back
   const getContainerSize = useCallback(() => {
@@ -254,10 +257,11 @@ export function SplitPane({
   const handlePointerStart = useCallback((index: number, clientPos: number) => {
     dragIndex.current = index;
     dragStart.current = clientPos;
-    sizesAtDragStart.current = [...sizes];
+    sizesAtDragStart.current = [...sizesRef.current];
     document.body.classList.add('kasm-resizing');
+    setIsDragging(true);
     onStartResize?.(index);
-  }, [sizes, onStartResize]);
+  }, [onStartResize]);
 
   const onSplitterMouseDown = useCallback((index: number, e: React.MouseEvent) => {
     const pos = orientation === 'horizontal' ? e.clientX : e.clientY;
@@ -277,6 +281,9 @@ export function SplitPane({
   // ============================================================
 
   useEffect(() => {
+    // Don't register global listeners when no drag is active
+    if (!isDragging) return;
+
     const handlePointerMove = (clientPos: number) => {
       if (dragIndex.current < 0) return;
 
@@ -316,7 +323,8 @@ export function SplitPane({
         const idx = dragIndex.current;
         dragIndex.current = -1;
         document.body.classList.remove('kasm-resizing');
-        onStopResize?.(idx, sizes);
+        setIsDragging(false);
+        onStopResize?.(idx, sizesRef.current);
       }
     };
 
@@ -333,7 +341,7 @@ export function SplitPane({
       document.removeEventListener('touchend', handlePointerEnd);
       document.removeEventListener('touchcancel', handlePointerEnd);
     };
-  }, [orientation, getContainerSize, getTotalFlex, dispatchOffset, onResize, onStopResize, sizes]);
+  }, [isDragging, orientation, getContainerSize, getTotalFlex, dispatchOffset, onResize, onStopResize]);
 
   // ============================================================
   // Window resize awareness

@@ -4,10 +4,10 @@
 // Includes project switcher, agent list, 3D git blocks
 // ============================================================
 
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
 import { useDesktopStore } from '../core/store';
 import { SlidingPane } from '../components/SlidingPane';
-import type { Project, AgentSession, AgentBackend, GitNode } from '../core/types';
+import type { Project, AgentSession, AgentBackend, AgentStatus, AgentTask, GitNode } from '../core/types';
 import './agentSidebar.css';
 
 // === Agent brand metadata ===
@@ -30,7 +30,9 @@ export function AgentSidebar() {
   const projects = useDesktopStore(s => s.projects);
   const activeProjectId = useDesktopStore(s => s.activeProjectId);
   const sidebarOpen = useDesktopStore(s => s.agentSidebarOpen);
-  const { createProject, setActiveProject, toggleAgentSidebar, spawnAgent, removeAgent, setActiveAgent } = useDesktopStore();
+  const createProject = useDesktopStore(s => s.createProject);
+  const setActiveProject = useDesktopStore(s => s.setActiveProject);
+  const toggleAgentSidebar = useDesktopStore(s => s.toggleAgentSidebar);
 
   const project = projects.find(p => p.id === activeProjectId) ?? null;
 
@@ -45,7 +47,7 @@ export function AgentSidebar() {
 
   const handleSpawn = (backend: AgentBackend) => {
     if (!activeProjectId) return;
-    spawnAgent(activeProjectId, backend);
+    useDesktopStore.getState().spawnAgent(activeProjectId, backend);
     setSpawnMenuOpen(false);
   };
 
@@ -86,8 +88,8 @@ export function AgentSidebar() {
             key={agent.id}
             agent={agent}
             isActive={project.activeAgentId === agent.id}
-            onFocus={() => activeProjectId && setActiveAgent(activeProjectId, agent.id)}
-            onRemove={() => activeProjectId && removeAgent(activeProjectId, agent.id)}
+            onFocus={() => activeProjectId && useDesktopStore.getState().setActiveAgent(activeProjectId, agent.id)}
+            onRemove={() => activeProjectId && useDesktopStore.getState().removeAgent(activeProjectId, agent.id)}
           />
         ))}
 
@@ -132,7 +134,7 @@ export function AgentSidebar() {
       {/* Agent detail sliding pane */}
       <AgentDetailPane
         agent={project?.agents.find(a => a.id === project?.activeAgentId) ?? null}
-        onClose={() => activeProjectId && setActiveAgent(activeProjectId, '')}
+        onClose={() => activeProjectId && useDesktopStore.getState().setActiveAgent(activeProjectId, '')}
       />
     </div>
   );
@@ -192,7 +194,6 @@ export function AgentFAB() {
   const [expanded, setExpanded] = useState(false);
   const projects = useDesktopStore(s => s.projects);
   const activeProjectId = useDesktopStore(s => s.activeProjectId);
-  const { setActiveAgent } = useDesktopStore();
   const project = projects.find(p => p.id === activeProjectId);
 
   return (
@@ -206,7 +207,7 @@ export function AgentFAB() {
             borderColor: AGENT_BRANDS[agent.backend]?.color,
           } as React.CSSProperties}
           onClick={() => {
-            if (activeProjectId) setActiveAgent(activeProjectId, agent.id);
+            if (activeProjectId) useDesktopStore.getState().setActiveAgent(activeProjectId, agent.id);
             setExpanded(false);
           }}
           title={agent.name}
@@ -274,7 +275,7 @@ function ProjectSwitcher({ projects, activeId, onSelect, onCreate }: {
   );
 }
 
-function AgentCard({ agent, isActive, onFocus, onRemove }: {
+const AgentCard = memo(function AgentCard({ agent, isActive, onFocus, onRemove }: {
   agent: AgentSession;
   isActive: boolean;
   onFocus: () => void;
@@ -305,9 +306,9 @@ function AgentCard({ agent, isActive, onFocus, onRemove }: {
       </button>
     </div>
   );
-}
+});
 
-function StatusDot({ status }: { status: string }) {
+const StatusDot = memo(function StatusDot({ status }: { status: AgentStatus | AgentTask['status'] }) {
   const cls =
     status === 'working' || status === 'in-progress' ? 'kasm-status-dot--working' :
     status === 'waiting' || status === 'assigned' ? 'kasm-status-dot--waiting' :
@@ -315,7 +316,7 @@ function StatusDot({ status }: { status: string }) {
     status === 'done' ? 'kasm-status-dot--done' :
     '';
   return <span className={`kasm-status-dot ${cls}`} />;
-}
+});
 
 // ============================================================
 // 3D Git Blocks - CSS 3D isometric visualization

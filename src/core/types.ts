@@ -26,11 +26,13 @@ export interface WindowState {
   minimizable: boolean;
 }
 
+// === Panel Height Default ===
+export const PANEL_HEIGHT_DEFAULT = 48;
+
 // === Snap Zones (Cinnamon window tiling) ===
 export type SnapZone =
   | 'left' | 'right' | 'top' | 'maximize'
-  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'
-  | null;
+  | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 
 // === Docking Layout (rc-dock model) ===
 export type DockDirection = 'left' | 'right' | 'top' | 'bottom' | 'center' | 'float';
