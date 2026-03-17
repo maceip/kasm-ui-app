@@ -20,6 +20,7 @@ export function Panel() {
   const windows = useDesktopStore(s => s.windows);
   const workspaces = useDesktopStore(s => s.workspaces);
   const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
+  const sidebarOpen = useDesktopStore(s => s.agentSidebarOpen);
 
   const [hidden, setHidden] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -79,7 +80,7 @@ export function Panel() {
     <>
       <div
         ref={panelRef}
-        className={`kasm-panel kasm-panel--${config.position} ${shouldSlide ? 'kasm-panel--hidden' : ''}`}
+        className={`kasm-panel kasm-panel--${config.position} ${shouldSlide ? 'kasm-panel--hidden' : ''} ${!sidebarOpen ? 'kasm-panel--no-sidebar' : ''}`}
         style={{
           height: config.height,
           transform: translateValue,

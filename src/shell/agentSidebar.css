@@ -1,0 +1,654 @@
+/* ============================================================
+   Agent Sidebar - Multi-agent orchestration panel
+   Desktop: 240px sidebar | Foldable: 56px rail | Mobile: FAB
+   ============================================================ */
+
+/* === Collapsed toggle === */
+.kasm-agent-sidebar__toggle {
+  position: fixed;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 48px;
+  border: none;
+  border-radius: 0 8px 8px 0;
+  background: var(--kasm-surface-bg);
+  border: 1px solid var(--kasm-surface-border);
+  border-left: none;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kasm-agent-sidebar__toggle:hover {
+  background: var(--kasm-tab-hover-bg);
+}
+
+.kasm-agent-sidebar__toggle-icon {
+  font-size: 18px;
+}
+
+/* === Main sidebar === */
+.kasm-agent-sidebar {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 48px; /* panel height */
+  width: 240px;
+  background: var(--kasm-surface-bg);
+  border-right: 1px solid var(--kasm-surface-border);
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  font-family: var(--kasm-font-family);
+  font-size: var(--kasm-font-size);
+  color: var(--kasm-surface-text);
+}
+
+.kasm-agent-sidebar__header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border-bottom: 1px solid var(--kasm-surface-border);
+  flex-shrink: 0;
+}
+
+.kasm-agent-sidebar__collapse {
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.kasm-agent-sidebar__collapse:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* === Project Switcher === */
+.kasm-project-switcher {
+  flex: 1;
+  position: relative;
+}
+
+.kasm-project-switcher__btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kasm-project-switcher__btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-project-switcher__arrow {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.kasm-project-switcher__dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  background: var(--kasm-surface-bg);
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.kasm-project-switcher__item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kasm-project-switcher__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-project-switcher__item--active {
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+}
+
+.kasm-project-switcher__item--new {
+  color: var(--kasm-accent);
+  border-top: 1px solid var(--kasm-surface-border);
+}
+
+.kasm-project-switcher__item-agents {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+/* === Git 3D Blocks === */
+.kasm-git-blocks {
+  padding: 8px;
+  border-bottom: 1px solid var(--kasm-surface-border);
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.kasm-git-blocks__scene {
+  perspective: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 4px;
+}
+
+.kasm-git-blocks__lane {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+}
+
+.kasm-git-blocks__branch-label {
+  width: 54px;
+  font-size: 9px;
+  color: var(--kasm-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kasm-git-blocks__block {
+  width: 18px;
+  height: 18px;
+  position: relative;
+  transform-style: preserve-3d;
+  transform: rotateX(-20deg) rotateY(25deg);
+  flex-shrink: 0;
+  animation: blockAppear 0.3s ease-out both;
+  animation-delay: calc(var(--node-idx, 0) * 0.05s);
+}
+
+@keyframes blockAppear {
+  from { opacity: 0; transform: rotateX(-20deg) rotateY(25deg) scale(0.5); }
+  to { opacity: 1; transform: rotateX(-20deg) rotateY(25deg) scale(1); }
+}
+
+.kasm-git-blocks__block-face {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+}
+
+.kasm-git-blocks__block-face--front {
+  background: var(--branch-color, var(--kasm-accent));
+  transform: translateZ(9px);
+}
+
+.kasm-git-blocks__block--merged .kasm-git-blocks__block-face--front {
+  opacity: 0.9;
+}
+
+.kasm-git-blocks__block--unmerged .kasm-git-blocks__block-face--front {
+  opacity: 0.7;
+  animation: blockPulse 2s ease-in-out infinite;
+}
+
+@keyframes blockPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.9; }
+}
+
+.kasm-git-blocks__block-face--top {
+  background: var(--branch-color, var(--kasm-accent));
+  filter: brightness(1.3);
+  height: 6px;
+  transform: rotateX(90deg) translateZ(9px);
+  transform-origin: top;
+}
+
+.kasm-git-blocks__block-face--right {
+  background: var(--branch-color, var(--kasm-accent));
+  filter: brightness(0.7);
+  width: 6px;
+  right: 0;
+  transform: rotateY(90deg) translateZ(9px);
+  transform-origin: right;
+}
+
+.kasm-git-blocks__legend {
+  display: flex;
+  gap: 12px;
+  padding: 4px 0 0;
+  font-size: 9px;
+  color: var(--kasm-text-muted);
+}
+
+.kasm-git-blocks__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.kasm-git-blocks__legend-block {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.kasm-git-blocks__legend-block--merged {
+  background: var(--kasm-success);
+  opacity: 0.9;
+}
+
+.kasm-git-blocks__legend-block--unmerged {
+  background: var(--kasm-accent);
+  opacity: 0.6;
+}
+
+/* === Agent list === */
+.kasm-agent-sidebar__agents {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 8px;
+  min-height: 0;
+}
+
+.kasm-agent-sidebar__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--kasm-text-muted);
+}
+
+.kasm-agent-sidebar__agent-count {
+  font-weight: 400;
+  font-size: 10px;
+}
+
+/* === Agent Card === */
+.kasm-agent-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  cursor: pointer;
+  border-left: 3px solid transparent;
+  transition: background 0.1s, border-color 0.15s;
+  margin-bottom: 2px;
+}
+
+.kasm-agent-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-agent-card--active {
+  background: rgba(255, 255, 255, 0.08);
+  border-left-color: var(--agent-color, var(--kasm-accent));
+}
+
+.kasm-agent-card__icon {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.kasm-agent-card__info {
+  flex: 1;
+  min-width: 0;
+}
+
+.kasm-agent-card__name {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kasm-agent-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--kasm-text-muted);
+}
+
+.kasm-agent-card__tokens {
+  margin-left: auto;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.kasm-agent-card__remove {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.kasm-agent-card:hover .kasm-agent-card__remove {
+  opacity: 0.6;
+}
+
+.kasm-agent-card__remove:hover {
+  opacity: 1;
+  color: var(--kasm-danger);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* === Status Dot === */
+.kasm-status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--kasm-text-muted);
+  flex-shrink: 0;
+}
+
+.kasm-status-dot--working {
+  background: var(--kasm-success);
+  box-shadow: 0 0 6px var(--kasm-success);
+  animation: statusPulse 1.5s ease-in-out infinite;
+}
+
+.kasm-status-dot--waiting {
+  background: var(--kasm-warning);
+  box-shadow: 0 0 4px var(--kasm-warning);
+}
+
+.kasm-status-dot--error {
+  background: var(--kasm-danger);
+  box-shadow: 0 0 4px var(--kasm-danger);
+}
+
+.kasm-status-dot--done {
+  background: var(--kasm-success);
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* === Spawn agent === */
+.kasm-agent-sidebar__spawn-wrap {
+  position: relative;
+  padding: 4px 0;
+}
+
+.kasm-agent-sidebar__spawn-btn {
+  width: 100%;
+  padding: 6px;
+  border: 1px dashed var(--kasm-surface-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--kasm-accent);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+}
+
+.kasm-agent-sidebar__spawn-btn:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--kasm-accent);
+}
+
+.kasm-agent-sidebar__spawn-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  background: var(--kasm-surface-bg);
+  border: 1px solid var(--kasm-surface-border);
+  border-radius: 6px;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
+  margin-bottom: 4px;
+  z-index: 10;
+}
+
+.kasm-agent-sidebar__spawn-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 12px;
+  border: none;
+  background: transparent;
+  color: var(--kasm-surface-text);
+  font-size: 12px;
+  font-family: var(--kasm-font-family);
+  cursor: pointer;
+  text-align: left;
+}
+
+.kasm-agent-sidebar__spawn-option:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.kasm-agent-sidebar__spawn-option-icon {
+  width: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* === Tasks === */
+.kasm-agent-sidebar__tasks {
+  padding: 4px 8px 8px;
+  border-top: 1px solid var(--kasm-surface-border);
+  flex-shrink: 0;
+}
+
+.kasm-agent-sidebar__task {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  font-size: 11px;
+  border-left: 3px solid transparent;
+}
+
+.kasm-agent-sidebar__task--in-progress {
+  border-left-color: var(--kasm-success);
+}
+
+.kasm-agent-sidebar__task--review {
+  border-left-color: var(--kasm-warning);
+}
+
+.kasm-agent-sidebar__task--done {
+  opacity: 0.5;
+}
+
+.kasm-agent-sidebar__task-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* === Mobile FAB === */
+.kasm-agent-fab {
+  display: none;
+}
+
+/* ============================================================
+   Responsive
+   ============================================================ */
+
+/* Mobile (< 640px): hide sidebar, show FAB */
+@media (max-width: 639px) {
+  .kasm-agent-sidebar,
+  .kasm-agent-sidebar__toggle {
+    display: none;
+  }
+
+  .kasm-agent-fab {
+    display: block;
+    position: fixed;
+    bottom: 72px;
+    right: 16px;
+    z-index: 10000;
+  }
+
+  .kasm-agent-fab__main {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: var(--kasm-accent);
+    color: var(--kasm-accent-text);
+    font-size: 22px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.15s;
+  }
+
+  .kasm-agent-fab--expanded .kasm-agent-fab__main {
+    transform: rotate(90deg);
+  }
+
+  .kasm-agent-fab__agent {
+    position: absolute;
+    bottom: var(--fab-offset, 52px);
+    right: 4px;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid var(--kasm-surface-border);
+    background: var(--kasm-surface-bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+    animation: fabPop 0.2s ease-out both;
+  }
+
+  @keyframes fabPop {
+    from { opacity: 0; transform: scale(0.5); }
+    to { opacity: 1; transform: scale(1); }
+  }
+}
+
+/* Foldable / Tablet (640px - 1023px): narrow rail */
+@media (min-width: 640px) and (max-width: 1023px) {
+  .kasm-agent-sidebar {
+    width: 56px;
+  }
+
+  .kasm-agent-sidebar__header {
+    flex-direction: column;
+    padding: 6px 4px;
+  }
+
+  .kasm-project-switcher__btn {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    font-size: 0;
+  }
+
+  .kasm-project-switcher__name {
+    display: none;
+  }
+
+  .kasm-project-switcher__arrow {
+    font-size: 16px;
+    opacity: 1;
+  }
+
+  .kasm-git-blocks {
+    display: none;
+  }
+
+  .kasm-agent-sidebar__section-header span:first-child,
+  .kasm-agent-sidebar__agent-count,
+  .kasm-agent-card__info,
+  .kasm-agent-card__remove,
+  .kasm-agent-sidebar__tasks,
+  .kasm-agent-sidebar__spawn-btn {
+    display: none;
+  }
+
+  .kasm-agent-sidebar__section-header {
+    justify-content: center;
+    padding: 4px;
+  }
+
+  .kasm-agent-card {
+    justify-content: center;
+    padding: 8px 4px;
+    border-left: 3px solid transparent;
+  }
+
+  .kasm-agent-card__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .kasm-agent-sidebar__spawn-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 4px;
+  }
+}
+
+/* Desktop (> 1024px): full sidebar shown above */

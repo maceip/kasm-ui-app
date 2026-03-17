@@ -12,6 +12,7 @@ import { AppMenu } from './shell/AppMenu';
 import { NotificationToasts } from './shell/NotificationCenter';
 import { ExpoView } from './shell/ExpoView';
 import { HotCorners } from './shell/HotCorners';
+import { AgentSidebar, AgentFAB } from './shell/AgentSidebar';
 import { useDesktopStore } from './core/store';
 import { usePersistence } from './core/persistence';
 import { vfs } from './apps/vfs';
@@ -108,6 +109,8 @@ export default function App() {
   return (
     <ThemeProvider>
       <CollabProvider>
+        <AgentSidebar />
+        <AgentFAB />
         <Desktop />
         <Panel />
         <AppMenu />

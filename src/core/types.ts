@@ -180,3 +180,54 @@ export interface SplitConstraints {
   flex?: number;
   direction?: -1 | 1;
 }
+
+// === Multi-Agent Orchestration ===
+
+export type AgentBackend = 'codex' | 'claude-code' | 'gemini-code' | 'cursor-agent' | 'devin' | 'junie' | 'cody' | 'custom';
+export type AgentStatus = 'idle' | 'working' | 'waiting' | 'error' | 'done';
+
+export interface AgentSession {
+  id: string;
+  backend: AgentBackend;
+  name: string;
+  status: AgentStatus;
+  taskId?: string;
+  branch?: string;
+  windowId?: string;       // linked terminal window
+  tokensUsed: number;
+  costUsd: number;
+  createdAt: number;
+  lastActivity: number;
+}
+
+export interface AgentTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: 'todo' | 'assigned' | 'in-progress' | 'review' | 'done';
+  assignedAgentId?: string;
+  branch?: string;
+  filesChanged: string[];
+  createdAt: number;
+}
+
+export interface GitNode {
+  hash: string;
+  short: string;
+  message: string;
+  branch?: string;
+  isMerged: boolean;
+  parentHashes: string[];
+  author?: string;
+  timestamp: number;
+}
+
+export interface Project {
+  id: string;
+  name: string;
+  path: string;                // VFS or local mount path
+  agents: AgentSession[];
+  tasks: AgentTask[];
+  gitNodes: GitNode[];         // for 3D visualization
+  activeAgentId?: string;
+}
