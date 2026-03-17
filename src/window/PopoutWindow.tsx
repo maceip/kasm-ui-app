@@ -31,6 +31,14 @@ interface PopoutWindowProps {
   top?: number;
   /** Called when the popup window is closed (by user or programmatically) */
   onClose: () => void;
+  /** Called when popup is blocked by browser */
+  onBlock?: () => void;
+  /** Called after the popup window successfully opens */
+  onOpen?: (popupWindow: Window) => void;
+  /** Whether to close the popup when the parent component unmounts (default: true) */
+  closeOnUnmount?: boolean;
+  /** Whether to copy stylesheets from parent to popup (default: true) */
+  copyStyles?: boolean;
   /** Children to render inside the popout window */
   children: React.ReactNode;
   /** Additional window features string */
@@ -104,27 +112,43 @@ export function PopoutWindow({
   left,
   top,
   onClose,
+  onBlock,
+  onOpen,
+  closeOnUnmount = true,
+  copyStyles: shouldCopyStyles = true,
   children,
   features: extraFeatures,
 }: PopoutWindowProps) {
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const popupRef = useRef<Window | null>(null);
   const closeCheckInterval = useRef<number | null>(null);
-  // Stable ref for onClose so the popup effect doesn't re-run on every parent render
+  const isMountedRef = useRef(true);
+
+  // Stable refs so the popup effect doesn't re-run on every parent render
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const onBlockRef = useRef(onBlock);
+  onBlockRef.current = onBlock;
+  const onOpenRef = useRef(onOpen);
+  onOpenRef.current = onOpen;
+
+  // Track mount state to prevent state updates after unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => { isMountedRef.current = false; };
+  }, []);
 
   // Clean up on unmount or close
-  const cleanup = useCallback(() => {
+  const cleanup = useCallback((shouldClose = true) => {
     if (closeCheckInterval.current !== null) {
       clearInterval(closeCheckInterval.current);
       closeCheckInterval.current = null;
     }
-    if (popupRef.current && !popupRef.current.closed) {
+    if (shouldClose && popupRef.current && !popupRef.current.closed) {
       popupRef.current.close();
     }
     popupRef.current = null;
-    setContainerEl(null);
+    if (isMountedRef.current) setContainerEl(null);
   }, []);
 
   useEffect(() => {
@@ -133,9 +157,11 @@ export function PopoutWindow({
       return;
     }
 
-    // Calculate window position (default to centered)
-    const screenLeft = left ?? Math.round((window.screen.width - width) / 2);
-    const screenTop = top ?? Math.round((window.screen.height - height) / 2);
+    // Center relative to parent window
+    const parentLeft = window.screenLeft ?? window.screenX ?? 0;
+    const parentTop = window.screenTop ?? window.screenY ?? 0;
+    const screenLeft = left ?? Math.round(parentLeft + (window.outerWidth - width) / 2);
+    const screenTop = top ?? Math.round(parentTop + (window.outerHeight - height) / 2);
 
     const featuresList = [
       `width=${width}`,
@@ -156,7 +182,11 @@ export function PopoutWindow({
 
     const popup = window.open('', '', featuresList.join(','));
     if (!popup) {
-      console.warn('PopoutWindow: Failed to open popup window. Popup blocker may be active.');
+      if (onBlockRef.current) {
+        onBlockRef.current();
+      } else {
+        console.warn('PopoutWindow: Popup blocked by browser.');
+      }
       onCloseRef.current();
       return;
     }
@@ -178,9 +208,14 @@ export function PopoutWindow({
     popup.document.body.style.overflow = 'hidden';
 
     // Copy all stylesheets from parent to popup
-    copyStylesheets(document, popup.document);
+    if (shouldCopyStyles) {
+      copyStylesheets(document, popup.document);
+    }
 
-    setContainerEl(container);
+    if (isMountedRef.current) setContainerEl(container);
+
+    // Notify caller the popup is open
+    onOpenRef.current?.(popup);
 
     // Handle popup window close via beforeunload
     const handleUnload = () => {
@@ -188,17 +223,17 @@ export function PopoutWindow({
     };
     popup.addEventListener('beforeunload', handleUnload);
 
-    // Poll for popup close (backup for cases where beforeunload doesn't fire)
+    // Poll for popup close (50ms for responsiveness, like react-new-window)
     closeCheckInterval.current = window.setInterval(() => {
       if (popup.closed) {
         cleanup();
         onCloseRef.current();
       }
-    }, 500);
+    }, 50);
 
     return () => {
       popup.removeEventListener('beforeunload', handleUnload);
-      cleanup();
+      cleanup(closeOnUnmount);
     };
     // Only re-run when `open` changes. Title updates handled separately.
     // eslint-disable-next-line react-hooks/exhaustive-deps
