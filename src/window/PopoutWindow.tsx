@@ -4,9 +4,15 @@
 // Uses React portal + stylesheet copying for seamless rendering
 // ============================================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
 import './PopoutWindow.css';
+
+// Memo boundary prevents unrelated parent re-renders from
+// reconciling the portal DOM, which would steal popup focus.
+const PopoutContent = memo(function PopoutContent({ children }: { children: React.ReactNode }) {
+  return <div className="kasm-popout-container">{children}</div>;
+});
 
 // ============================================================
 // Types
@@ -104,6 +110,9 @@ export function PopoutWindow({
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const popupRef = useRef<Window | null>(null);
   const closeCheckInterval = useRef<number | null>(null);
+  // Stable ref for onClose so the popup effect doesn't re-run on every parent render
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   // Clean up on unmount or close
   const cleanup = useCallback(() => {
@@ -148,7 +157,7 @@ export function PopoutWindow({
     const popup = window.open('', '', featuresList.join(','));
     if (!popup) {
       console.warn('PopoutWindow: Failed to open popup window. Popup blocker may be active.');
-      onClose();
+      onCloseRef.current();
       return;
     }
 
@@ -175,7 +184,7 @@ export function PopoutWindow({
 
     // Handle popup window close via beforeunload
     const handleUnload = () => {
-      onClose();
+      onCloseRef.current();
     };
     popup.addEventListener('beforeunload', handleUnload);
 
@@ -183,7 +192,7 @@ export function PopoutWindow({
     closeCheckInterval.current = window.setInterval(() => {
       if (popup.closed) {
         cleanup();
-        onClose();
+        onCloseRef.current();
       }
     }, 500);
 
@@ -191,7 +200,9 @@ export function PopoutWindow({
       popup.removeEventListener('beforeunload', handleUnload);
       cleanup();
     };
-  }, [open, title, width, height, left, top, extraFeatures, onClose, cleanup]);
+    // Only re-run when `open` changes. Title updates handled separately.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cleanup]);
 
   // Update title when it changes
   useEffect(() => {
@@ -200,13 +211,13 @@ export function PopoutWindow({
     }
   }, [title]);
 
-  // Render children into the popup via portal
+  // Render children into the popup via portal.
+  // Key: wrap in a memo boundary so unrelated parent re-renders
+  // don't cause the portal to reconcile and steal popup focus.
   if (!containerEl || !open) return null;
 
   return createPortal(
-    <div className="kasm-popout-container">
-      {children}
-    </div>,
+    <PopoutContent>{children}</PopoutContent>,
     containerEl,
   );
 }

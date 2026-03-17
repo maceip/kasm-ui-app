@@ -147,17 +147,18 @@ export function Window({ win, children }: WindowProps) {
   if (isMinimized) return null;
 
   if (poppedOut) {
+    // When popped out, render nothing in the main window.
+    // The popup is fully independent - no portal, no focus stealing.
+    // We only keep a ref to detect when the popup closes.
     return (
       <PopoutWindow
-        open={true}
+        open
         title={win.title}
         width={win.width}
         height={win.height}
         onClose={() => setPoppedOut(false)}
       >
-        <div className="kasm-window__content">
-          {children}
-        </div>
+        {children}
       </PopoutWindow>
     );
   }
