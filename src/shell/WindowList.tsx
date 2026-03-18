@@ -9,7 +9,6 @@ export function WindowList() {
   const windows = useDesktopStore(s => s.windows);
   const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
   const workspaces = useDesktopStore(s => s.workspaces);
-  const { focusWindow, minimizeWindow } = useDesktopStore();
 
   const activeWs = workspaces.find(ws => ws.id === activeWorkspaceId);
   const visibleWindows = windows.filter(w => activeWs?.windowIds.includes(w.id));
@@ -22,9 +21,9 @@ export function WindowList() {
           className={`kasm-panel-btn ${win.focused ? 'kasm-panel-btn--focused' : ''} ${win.state === 'minimized' ? '' : 'kasm-panel-btn--active'}`}
           onClick={() => {
             if (win.focused && win.state !== 'minimized') {
-              minimizeWindow(win.id);
+              useDesktopStore.getState().minimizeWindow(win.id);
             } else {
-              focusWindow(win.id);
+              useDesktopStore.getState().focusWindow(win.id);
             }
           }}
           title={win.title}

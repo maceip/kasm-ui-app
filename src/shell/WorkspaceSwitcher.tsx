@@ -9,7 +9,7 @@ export function WorkspaceSwitcher() {
   const workspaces = useDesktopStore(s => s.workspaces);
   const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
   const windows = useDesktopStore(s => s.windows);
-  const { switchWorkspace } = useDesktopStore();
+  const switchWorkspace = useDesktopStore(s => s.switchWorkspace);
 
   return (
     <div className="kasm-workspace-switcher">

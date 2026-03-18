@@ -8,6 +8,13 @@ import { useRef, useCallback, useState, useEffect, memo } from 'react';
 import { useDesktopStore } from '../core/store';
 import { TitleBar } from './TitleBar';
 import { PopoutWindow } from './PopoutWindow';
+import {
+  detectSnapZone,
+  getSnapPreviewStyle,
+  getResizeCursor,
+  computeResize,
+  type ResizeDir,
+} from '../lib/windowActions';
 import type { WindowState, SnapZone } from '../core/types';
 import './window.css';
 
@@ -16,12 +23,10 @@ interface WindowProps {
   children: React.ReactNode;
 }
 
-type ResizeDir = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null;
-
 export const Window = memo(function Window({ win, children }: WindowProps) {
   const [poppedOut, setPoppedOut] = useState(false);
   const [dragging, setDragging] = useState(false);
-  const [resizing, setResizing] = useState<ResizeDir>(null);
+  const [resizing, setResizing] = useState<ResizeDir | null>(null);
   const [snapPreview, setSnapPreview] = useState<SnapZone | null>(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0, wx: 0, wy: 0 });
@@ -55,13 +60,13 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
       useDesktopStore.getState().moveWindow(win.id, Math.max(0, x), Math.max(0, y));
 
       // Snap zone detection (Cinnamon-style edge snapping)
-      const zone = detectSnapZone(e.clientX, e.clientY);
+      const zone = detectSnapZone(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
       setSnapPreview(zone);
     };
 
     const onUp = (e: MouseEvent) => {
       setDragging(false);
-      const zone = detectSnapZone(e.clientX, e.clientY);
+      const zone = detectSnapZone(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
       if (zone) {
         useDesktopStore.getState().snapWindow(win.id, zone);
       }
@@ -102,21 +107,17 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
       const dx = e.clientX - resizeStart.current.x;
       const dy = e.clientY - resizeStart.current.y;
       const s = resizeStart.current;
-      let newW = s.w, newH = s.h, newX = s.wx, newY = s.wy;
 
-      if (resizing.includes('e')) newW = s.w + dx;
-      if (resizing.includes('w')) { newW = s.w - dx; newX = s.wx + dx; }
-      if (resizing.includes('s')) newH = s.h + dy;
-      if (resizing.includes('n')) { newH = s.h - dy; newY = s.wy + dy; }
+      const result = computeResize(
+        resizing, dx, dy,
+        s.wx, s.wy, s.w, s.h,
+        win.minWidth, win.minHeight, win.maxWidth, win.maxHeight,
+      );
 
-      // Re-Flex style constraints
-      newW = Math.max(win.minWidth, Math.min(newW, win.maxWidth ?? Infinity));
-      newH = Math.max(win.minHeight, Math.min(newH, win.maxHeight ?? Infinity));
-
-      if (newX !== s.wx || newY !== s.wy) {
-        useDesktopStore.getState().moveWindow(win.id, Math.max(0, newX), Math.max(0, newY));
+      if (result.x !== s.wx || result.y !== s.wy) {
+        useDesktopStore.getState().moveWindow(win.id, result.x, result.y);
       }
-      useDesktopStore.getState().resizeWindow(win.id, newW, newH);
+      useDesktopStore.getState().resizeWindow(win.id, result.width, result.height);
     };
 
     const onUp = () => setResizing(null);
@@ -211,67 +212,9 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
   );
 });
 
-// Cinnamon snap zone detection
-function detectSnapZone(mouseX: number, mouseY: number): SnapZone {
-  const threshold = 8;
-  const w = window.innerWidth;
-  const h = window.innerHeight;
-  const cornerSize = 60;
-
-  const atLeft = mouseX <= threshold;
-  const atRight = mouseX >= w - threshold;
-  const atTop = mouseY <= threshold;
-
-  if (atTop && atLeft) return 'top-left';
-  if (atTop && atRight) return 'top-right';
-  if (atTop) return 'maximize';
-  if (atLeft && mouseY < cornerSize) return 'top-left';
-  if (atLeft && mouseY > h - cornerSize) return 'bottom-left';
-  if (atRight && mouseY < cornerSize) return 'top-right';
-  if (atRight && mouseY > h - cornerSize) return 'bottom-right';
-  if (atLeft) return 'left';
-  if (atRight) return 'right';
-
-  return null;
-}
-
+// Snap preview overlay - uses portable getSnapPreviewStyle from lib
 function SnapPreviewOverlay({ zone }: { zone: SnapZone }) {
-  const style = getSnapPreviewStyle(zone);
+  const style = getSnapPreviewStyle(zone, 48);
   if (!style) return null;
-
-  return (
-    <div className="kasm-snap-preview" style={style} />
-  );
-}
-
-function getSnapPreviewStyle(zone: SnapZone): React.CSSProperties | null {
-  const panelH = 48;
-  switch (zone) {
-    case 'left':
-      return { left: 0, top: 0, width: '50%', bottom: panelH };
-    case 'right':
-      return { right: 0, top: 0, width: '50%', bottom: panelH };
-    case 'maximize':
-      return { left: 0, top: 0, right: 0, bottom: panelH };
-    case 'top-left':
-      return { left: 0, top: 0, width: '50%', height: `calc(50% - ${panelH / 2}px)` };
-    case 'top-right':
-      return { right: 0, top: 0, width: '50%', height: `calc(50% - ${panelH / 2}px)` };
-    case 'bottom-left':
-      return { left: 0, bottom: panelH, width: '50%', height: `calc(50% - ${panelH / 2}px)` };
-    case 'bottom-right':
-      return { right: 0, bottom: panelH, width: '50%', height: `calc(50% - ${panelH / 2}px)` };
-    default:
-      return null;
-  }
-}
-
-function getResizeCursor(dir: ResizeDir): string {
-  switch (dir) {
-    case 'n': case 's': return 'ns-resize';
-    case 'e': case 'w': return 'ew-resize';
-    case 'ne': case 'sw': return 'nesw-resize';
-    case 'nw': case 'se': return 'nwse-resize';
-    default: return '';
-  }
+  return <div className="kasm-snap-preview" style={style as React.CSSProperties} />;
 }

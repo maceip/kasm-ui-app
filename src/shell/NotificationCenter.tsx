@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDesktopStore } from '../core/store';
+import { formatTimeAgo } from '../lib/domUtils';
 import type { Notification } from '../core/types';
 import './notifications.css';
 
@@ -30,7 +31,9 @@ export function NotificationApplet() {
 
 function NotificationTray({ onClose }: { onClose: () => void }) {
   const notifications = useDesktopStore(s => s.notifications);
-  const { dismissNotification, markNotificationRead, clearNotifications } = useDesktopStore();
+  const dismissNotification = useDesktopStore(s => s.dismissNotification);
+  const markNotificationRead = useDesktopStore(s => s.markNotificationRead);
+  const clearNotifications = useDesktopStore(s => s.clearNotifications);
 
   const handleClear = () => {
     clearNotifications();
@@ -131,12 +134,4 @@ export function NotificationToasts() {
   );
 }
 
-function formatTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
-}
+// formatTimeAgo is now in src/lib/domUtils.ts (framework-agnostic)

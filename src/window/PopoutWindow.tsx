@@ -6,6 +6,7 @@
 
 import { useState, useEffect, useRef, useCallback, memo } from 'react';
 import { createPortal } from 'react-dom';
+import { copyStylesheets } from '../lib/domUtils';
 import './PopoutWindow.css';
 
 // Memo boundary prevents unrelated parent re-renders from
@@ -54,54 +55,9 @@ interface PopoutButtonProps {
 }
 
 // ============================================================
-// Copy stylesheets from parent window to child window
-// ============================================================
-
-function copyStylesheets(sourceDoc: Document, targetDoc: Document): void {
-  // Copy <link> stylesheets
-  const links = sourceDoc.querySelectorAll('link[rel="stylesheet"]');
-  links.forEach((link) => {
-    const clone = targetDoc.createElement('link');
-    clone.rel = 'stylesheet';
-    clone.href = (link as HTMLLinkElement).href;
-    if ((link as HTMLLinkElement).media) {
-      clone.media = (link as HTMLLinkElement).media;
-    }
-    targetDoc.head.appendChild(clone);
-  });
-
-  // Copy <style> elements
-  const styles = sourceDoc.querySelectorAll('style');
-  styles.forEach((style) => {
-    const clone = targetDoc.createElement('style');
-    clone.textContent = style.textContent;
-    targetDoc.head.appendChild(clone);
-  });
-
-  // Copy CSS custom properties from :root
-  const rootStyles = sourceDoc.documentElement.style.cssText;
-  if (rootStyles) {
-    targetDoc.documentElement.style.cssText = rootStyles;
-  }
-
-  // Also copy computed CSS variables from the parent document element
-  const computed = window.getComputedStyle(sourceDoc.documentElement);
-  const cssVars: string[] = [];
-  for (let i = 0; i < computed.length; i++) {
-    const prop = computed[i];
-    if (prop.startsWith('--')) {
-      cssVars.push(`${prop}: ${computed.getPropertyValue(prop)}`);
-    }
-  }
-  if (cssVars.length > 0) {
-    const varStyle = targetDoc.createElement('style');
-    varStyle.textContent = `:root { ${cssVars.join('; ')} }`;
-    targetDoc.head.appendChild(varStyle);
-  }
-}
-
-// ============================================================
 // PopoutWindow component
+// NOTE: This component uses React's createPortal — the hardest
+// pattern to port to SolidJS. See MIGRATION.md for strategy.
 // ============================================================
 
 export function PopoutWindow({

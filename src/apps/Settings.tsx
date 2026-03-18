@@ -14,7 +14,13 @@ type Section = (typeof SECTIONS)[number];
 
 export function Settings({ windowId }: AppProps) {
   const [section, setSection] = useState<Section>('Appearance');
-  const { activeThemeId, setTheme, panelConfig, setPanelConfig, workspaces, addWorkspace, removeWorkspace } = useDesktopStore();
+  const activeThemeId = useDesktopStore(s => s.activeThemeId);
+  const setTheme = useDesktopStore(s => s.setTheme);
+  const panelConfig = useDesktopStore(s => s.panelConfig);
+  const setPanelConfig = useDesktopStore(s => s.setPanelConfig);
+  const workspaces = useDesktopStore(s => s.workspaces);
+  const addWorkspace = useDesktopStore(s => s.addWorkspace);
+  const removeWorkspace = useDesktopStore(s => s.removeWorkspace);
 
   return (
     <div className="kasm-app kasm-settings">

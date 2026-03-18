@@ -1,30 +1,28 @@
 // ============================================================
-// Window Slice - Window management state & actions
+// Window Slice - Zustand binding for window management.
+// Pure mutation logic lives in src/lib/windowActions.ts.
+// This file is the ONLY framework-specific layer for window state.
 // ============================================================
 
 import { v4 as uuid } from 'uuid';
 import type { StateCreator } from 'zustand';
 import type { WindowState, AppDefinition, SnapZone } from '../types';
 import { PANEL_HEIGHT_DEFAULT } from '../types';
+import {
+  CASCADE_OFFSET,
+  getSnapBounds,
+  applyFocusWindow,
+  applyMoveWindow,
+  applyResizeWindow,
+  applySnapWindow,
+  applyMinimizeWindow,
+  applyMaximizeWindow,
+  applyRestoreWindow,
+  applyUpdateWindowTitle,
+} from '../../lib/windowActions';
 
 const DESKTOP_WIDTH = () => window.innerWidth;
 const DESKTOP_HEIGHT = () => window.innerHeight - PANEL_HEIGHT_DEFAULT;
-const CASCADE_OFFSET = 30;
-
-function getSnapBounds(zone: SnapZone): { x: number; y: number; width: number; height: number } {
-  const w = DESKTOP_WIDTH();
-  const h = DESKTOP_HEIGHT();
-  switch (zone) {
-    case 'left': return { x: 0, y: 0, width: w / 2, height: h };
-    case 'right': return { x: w / 2, y: 0, width: w / 2, height: h };
-    case 'maximize': return { x: 0, y: 0, width: w, height: h };
-    case 'top-left': return { x: 0, y: 0, width: w / 2, height: h / 2 };
-    case 'top-right': return { x: w / 2, y: 0, width: w / 2, height: h / 2 };
-    case 'bottom-left': return { x: 0, y: h / 2, width: w / 2, height: h / 2 };
-    case 'bottom-right': return { x: w / 2, y: h / 2, width: w / 2, height: h / 2 };
-    default: return { x: 0, y: 0, width: w, height: h };
-  }
-}
 
 export interface WindowSlice {
   // State
@@ -116,78 +114,51 @@ export const createWindowSlice: StateCreator<WindowSlice & Record<string, any>, 
   focusWindow: (id) => {
     const z = get().nextZIndex;
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) => ({
-        ...w,
-        focused: w.id === id,
-        zIndex: w.id === id ? z : w.zIndex,
-        state: w.id === id && w.state === 'minimized' ? 'normal' : w.state,
-      })),
+      windows: applyFocusWindow(s.windows, id, z),
       nextZIndex: z + 1,
     }));
   },
 
   minimizeWindow: (id) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id ? { ...w, state: 'minimized', focused: false } : w
-      ),
+      windows: applyMinimizeWindow(s.windows, id),
     }));
   },
 
   maximizeWindow: (id) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id
-          ? { ...w, state: 'maximized', ...getSnapBounds('maximize') }
-          : w
-      ),
+      windows: applyMaximizeWindow(s.windows, id, DESKTOP_WIDTH(), DESKTOP_HEIGHT()),
     }));
   },
 
   restoreWindow: (id) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id ? { ...w, state: 'normal' } : w
-      ),
+      windows: applyRestoreWindow(s.windows, id),
     }));
   },
 
   snapWindow: (id, zone) => {
     if (!zone) return;
-    const bounds = getSnapBounds(zone);
-    const state = zone === 'maximize' ? 'maximized' as const : `snapped-${zone}` as WindowState['state'];
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id ? { ...w, state, ...bounds } : w
-      ),
+      windows: applySnapWindow(s.windows, id, zone, DESKTOP_WIDTH(), DESKTOP_HEIGHT()),
     }));
   },
 
   moveWindow: (id, x, y) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id ? { ...w, x, y, state: 'normal' } : w
-      ),
+      windows: applyMoveWindow(s.windows, id, x, y),
     }));
   },
 
   resizeWindow: (id, width, height) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) =>
-        w.id === id
-          ? {
-              ...w,
-              width: Math.max(w.minWidth, Math.min(width, w.maxWidth ?? Infinity)),
-              height: Math.max(w.minHeight, Math.min(height, w.maxHeight ?? Infinity)),
-            }
-          : w
-      ),
+      windows: applyResizeWindow(s.windows, id, width, height),
     }));
   },
 
   updateWindowTitle: (id, title) => {
     set((s: any) => ({
-      windows: s.windows.map((w: WindowState) => w.id === id ? { ...w, title } : w),
+      windows: applyUpdateWindowTitle(s.windows, id, title),
     }));
   },
 });
