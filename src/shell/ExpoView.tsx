@@ -1,28 +1,18 @@
 // ============================================================
 // ExpoView - Expo and Scale view for workspace/window overview
-// Expo: shows all workspaces side by side with miniature windows
-// Scale: shows all windows in current workspace spread in a grid
 // ============================================================
 
-import { useEffect, useCallback } from 'react';
-import { useDesktopStore } from '../core/store';
+import { createEffect, onCleanup, Show, For, createMemo } from 'solid-js';
+import { desktop, setExpoMode, switchWorkspace, focusWindow, addWorkspace } from '../core/store';
+import type { WindowState } from '../core/types';
 import './expoView.css';
 
 export function ExpoView() {
-  const expoMode = useDesktopStore(s => s.expoMode);
-  const setExpoMode = useDesktopStore(s => s.setExpoMode);
-  const workspaces = useDesktopStore(s => s.workspaces);
-  const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
-  const windows = useDesktopStore(s => s.windows);
-  const switchWorkspace = useDesktopStore(s => s.switchWorkspace);
-  const focusWindow = useDesktopStore(s => s.focusWindow);
-  const addWorkspace = useDesktopStore(s => s.addWorkspace);
+  const close = () => setExpoMode('off');
 
-  const close = useCallback(() => setExpoMode('off'), [setExpoMode]);
-
-  // Close on Escape
-  useEffect(() => {
-    if (expoMode === 'off') return;
+  // Escape key handler
+  createEffect(() => {
+    if (desktop.expoMode === 'off') return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         close();
@@ -30,111 +20,108 @@ export function ExpoView() {
       }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [expoMode, close]);
+    onCleanup(() => window.removeEventListener('keydown', handler));
+  });
 
-  if (expoMode === 'off') return null;
+  const activeWs = () => desktop.workspaces.find(ws => ws.id === desktop.activeWorkspaceId);
+  const visibleWindows = createMemo(() =>
+    (desktop.windows as WindowState[]).filter(
+      w => activeWs()?.windowIds.includes(w.id) && w.state !== 'minimized'
+    )
+  );
+  const cols = () => Math.ceil(Math.sqrt(visibleWindows().length));
+  const rows = () => Math.ceil(visibleWindows().length / cols()) || 1;
 
-  if (expoMode === 'expo') {
-    return (
-      <div className="kasm-expo-overlay kasm-expo-overlay--active" data-testid="expo-view" onClick={close}>
-        <div className="kasm-expo-container" onClick={e => e.stopPropagation()}>
-          <h2 className="kasm-expo-title">Workspaces</h2>
-          <div className="kasm-expo-grid">
-            {workspaces.map(ws => {
-              const wsWindows = windows.filter(w => ws.windowIds.includes(w.id) && w.state !== 'minimized');
-              const isActive = ws.id === activeWorkspaceId;
-              return (
-                <div
-                  key={ws.id}
-                  className={`kasm-expo-workspace ${isActive ? 'kasm-expo-workspace--active' : ''}`}
-                  onClick={() => {
-                    switchWorkspace(ws.id);
-                    close();
-                  }}
-                >
-                  <div className="kasm-expo-workspace__preview">
-                    {wsWindows.map(w => {
-                      // Scale window positions to fit in the thumbnail
-                      const scaleX = 200 / window.innerWidth;
-                      const scaleY = 130 / window.innerHeight;
-                      return (
-                        <div
-                          key={w.id}
-                          className="kasm-expo-miniwindow"
-                          style={{
-                            left: w.x * scaleX,
-                            top: w.y * scaleY,
-                            width: w.width * scaleX,
-                            height: w.height * scaleY,
-                            backgroundColor: `hsl(${hashCode(w.appId) % 360}, 60%, 50%)`,
-                            zIndex: w.zIndex,
-                          }}
-                          title={w.title}
-                        >
-                          <span className="kasm-expo-miniwindow__icon">{w.icon}</span>
-                        </div>
-                      );
-                    })}
+  return (
+    <Show when={desktop.expoMode !== 'off'}>
+      <Show when={desktop.expoMode === 'expo'} fallback={
+        // Scale mode
+        <div class="kasm-expo-overlay kasm-expo-overlay--active" data-testid="scale-view" onClick={close}>
+          <div class="kasm-scale-container" onClick={e => e.stopPropagation()}>
+            <h2 class="kasm-expo-title">Windows</h2>
+            <div
+              class="kasm-scale-grid"
+              style={{
+                "grid-template-columns": `repeat(${cols()}, 1fr)`,
+                "grid-template-rows": `repeat(${rows()}, 1fr)`,
+              }}
+            >
+              <For each={visibleWindows()}>
+                {(w) => (
+                  <div
+                    class={`kasm-scale-window ${w.focused ? 'kasm-scale-window--focused' : ''}`}
+                    onClick={() => { focusWindow(w.id); close(); }}
+                  >
+                    <div class="kasm-scale-window__preview"
+                      style={{ "background-color": `hsl(${hashCode(w.appId) % 360}, 40%, 30%)` }}
+                    >
+                      <span class="kasm-scale-window__icon">{w.icon}</span>
+                    </div>
+                    <div class="kasm-scale-window__title">{w.title}</div>
                   </div>
-                  <div className="kasm-expo-workspace__label">{ws.name}</div>
-                </div>
-              );
-            })}
-            <div className="kasm-expo-workspace kasm-expo-workspace--add" onClick={() => { addWorkspace(); }}>
-              <div className="kasm-expo-workspace__preview kasm-expo-workspace__preview--add">
-                <span className="kasm-expo-add-icon">+</span>
-              </div>
-              <div className="kasm-expo-workspace__label">New Workspace</div>
+                )}
+              </For>
+              <Show when={visibleWindows().length === 0}>
+                <div class="kasm-scale-empty">No windows in this workspace</div>
+              </Show>
             </div>
           </div>
         </div>
-      </div>
-    );
-  }
-
-  // Scale mode - show windows of current workspace in a grid
-  const activeWs = workspaces.find(ws => ws.id === activeWorkspaceId);
-  const visibleWindows = windows.filter(
-    w => activeWs?.windowIds.includes(w.id) && w.state !== 'minimized'
-  );
-  const cols = Math.ceil(Math.sqrt(visibleWindows.length));
-  const rows = Math.ceil(visibleWindows.length / cols) || 1;
-
-  return (
-    <div className="kasm-expo-overlay kasm-expo-overlay--active" data-testid="scale-view" onClick={close}>
-      <div className="kasm-scale-container" onClick={e => e.stopPropagation()}>
-        <h2 className="kasm-expo-title">Windows</h2>
-        <div
-          className="kasm-scale-grid"
-          style={{
-            gridTemplateColumns: `repeat(${cols}, 1fr)`,
-            gridTemplateRows: `repeat(${rows}, 1fr)`,
-          }}
-        >
-          {visibleWindows.map(w => (
-            <div
-              key={w.id}
-              className={`kasm-scale-window ${w.focused ? 'kasm-scale-window--focused' : ''}`}
-              onClick={() => {
-                focusWindow(w.id);
-                close();
-              }}
-            >
-              <div className="kasm-scale-window__preview"
-                style={{ backgroundColor: `hsl(${hashCode(w.appId) % 360}, 40%, 30%)` }}
-              >
-                <span className="kasm-scale-window__icon">{w.icon}</span>
+      }>
+        {/* Expo mode */}
+        <div class="kasm-expo-overlay kasm-expo-overlay--active" data-testid="expo-view" onClick={close}>
+          <div class="kasm-expo-container" onClick={e => e.stopPropagation()}>
+            <h2 class="kasm-expo-title">Workspaces</h2>
+            <div class="kasm-expo-grid">
+              <For each={desktop.workspaces}>
+                {(ws) => {
+                  const wsWindows = () => (desktop.windows as WindowState[]).filter(w => ws.windowIds.includes(w.id) && w.state !== 'minimized');
+                  const isActive = () => ws.id === desktop.activeWorkspaceId;
+                  return (
+                    <div
+                      class={`kasm-expo-workspace ${isActive() ? 'kasm-expo-workspace--active' : ''}`}
+                      onClick={() => { switchWorkspace(ws.id); close(); }}
+                    >
+                      <div class="kasm-expo-workspace__preview">
+                        <For each={wsWindows()}>
+                          {(w) => {
+                            const scaleX = 200 / window.innerWidth;
+                            const scaleY = 130 / window.innerHeight;
+                            return (
+                              <div
+                                class="kasm-expo-miniwindow"
+                                style={{
+                                  left: `${w.x * scaleX}px`,
+                                  top: `${w.y * scaleY}px`,
+                                  width: `${w.width * scaleX}px`,
+                                  height: `${w.height * scaleY}px`,
+                                  "background-color": `hsl(${hashCode(w.appId) % 360}, 60%, 50%)`,
+                                  "z-index": w.zIndex,
+                                }}
+                                title={w.title}
+                              >
+                                <span class="kasm-expo-miniwindow__icon">{w.icon}</span>
+                              </div>
+                            );
+                          }}
+                        </For>
+                      </div>
+                      <div class="kasm-expo-workspace__label">{ws.name}</div>
+                    </div>
+                  );
+                }}
+              </For>
+              <div class="kasm-expo-workspace kasm-expo-workspace--add" onClick={() => addWorkspace()}>
+                <div class="kasm-expo-workspace__preview kasm-expo-workspace__preview--add">
+                  <span class="kasm-expo-add-icon">+</span>
+                </div>
+                <div class="kasm-expo-workspace__label">New Workspace</div>
               </div>
-              <div className="kasm-scale-window__title">{w.title}</div>
             </div>
-          ))}
-          {visibleWindows.length === 0 && (
-            <div className="kasm-scale-empty">No windows in this workspace</div>
-          )}
+          </div>
         </div>
-      </div>
-    </div>
+      </Show>
+    </Show>
   );
 }
 

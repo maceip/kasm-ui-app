@@ -3,76 +3,76 @@
 // Toast popups + notification tray in panel
 // ============================================================
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useDesktopStore } from '../core/store';
+import { createSignal, createEffect, Show, For } from 'solid-js';
+import { desktop, dismissNotification, markNotificationRead, clearNotifications } from '../core/store';
+import { formatTimeAgo } from '../lib/domUtils';
 import type { Notification } from '../core/types';
 import './notifications.css';
 
 // Panel applet (bell icon with count)
 export function NotificationApplet() {
-  const notifications = useDesktopStore(s => s.notifications);
-  const [showTray, setShowTray] = useState(false);
-  const unread = notifications.filter(n => !n.read).length;
+  const [showTray, setShowTray] = createSignal(false);
+  const unread = () => desktop.notifications.filter(n => !n.read).length;
 
   return (
-    <div className="kasm-notif-applet">
+    <div class="kasm-notif-applet">
       <button
-        className={`kasm-panel-btn ${unread > 0 ? 'kasm-panel-btn--active' : ''}`}
-        onClick={() => setShowTray(!showTray)}
+        class={`kasm-panel-btn ${unread() > 0 ? 'kasm-panel-btn--active' : ''}`}
+        onClick={() => setShowTray(!showTray())}
       >
-        <span className="kasm-panel-btn__icon">{'\u{1F514}'}</span>
-        <span className={`kasm-notif-applet__badge ${unread > 0 ? '' : 'kasm-notif-applet__badge--hidden'}`}>{unread || 0}</span>
+        <span class="kasm-panel-btn__icon">{'\u{1F514}'}</span>
+        <span class={`kasm-notif-applet__badge ${unread() > 0 ? '' : 'kasm-notif-applet__badge--hidden'}`}>{unread() || 0}</span>
       </button>
-      {showTray && <NotificationTray onClose={() => setShowTray(false)} />}
+      <Show when={showTray()}>
+        <NotificationTray onClose={() => setShowTray(false)} />
+      </Show>
     </div>
   );
 }
 
-function NotificationTray({ onClose }: { onClose: () => void }) {
-  const notifications = useDesktopStore(s => s.notifications);
-  const { dismissNotification, markNotificationRead, clearNotifications } = useDesktopStore();
-
+function NotificationTray(props: { onClose: () => void }) {
   const handleClear = () => {
     clearNotifications();
-    onClose();
+    props.onClose();
   };
 
   return (
-    <div className="kasm-notif-tray">
-      <div className="kasm-notif-tray__header">
+    <div class="kasm-notif-tray">
+      <div class="kasm-notif-tray__header">
         <span>Notifications</span>
-        {notifications.length > 0 && (
-          <button className="kasm-notif-tray__clear" onClick={handleClear}>
+        <Show when={desktop.notifications.length > 0}>
+          <button class="kasm-notif-tray__clear" onClick={handleClear}>
             Clear all
           </button>
-        )}
+        </Show>
       </div>
-      <div className="kasm-notif-tray__list">
-        {notifications.length === 0 && (
-          <div className="kasm-notif-tray__empty">No notifications</div>
-        )}
-        {notifications.map(n => (
-          <div
-            key={n.id}
-            className={`kasm-notif-tray__item ${!n.read ? 'kasm-notif-tray__item--unread' : ''}`}
-            onClick={() => markNotificationRead(n.id)}
-          >
-            <div className="kasm-notif-tray__item-header">
-              {n.icon && <span>{n.icon}</span>}
-              <span className="kasm-notif-tray__item-title">{n.title}</span>
-              <button
-                className="kasm-notif-tray__item-dismiss"
-                onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
-              >
-                ✕
-              </button>
+      <div class="kasm-notif-tray__list">
+        <Show when={desktop.notifications.length === 0}>
+          <div class="kasm-notif-tray__empty">No notifications</div>
+        </Show>
+        <For each={desktop.notifications}>
+          {(n) => (
+            <div
+              class={`kasm-notif-tray__item ${!n.read ? 'kasm-notif-tray__item--unread' : ''}`}
+              onClick={() => markNotificationRead(n.id)}
+            >
+              <div class="kasm-notif-tray__item-header">
+                {n.icon && <span>{n.icon}</span>}
+                <span class="kasm-notif-tray__item-title">{n.title}</span>
+                <button
+                  class="kasm-notif-tray__item-dismiss"
+                  onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
+                >
+                  {'\u2715'}
+                </button>
+              </div>
+              <div class="kasm-notif-tray__item-body">{n.body}</div>
+              <div class="kasm-notif-tray__item-time">
+                {formatTimeAgo(n.timestamp)}
+              </div>
             </div>
-            <div className="kasm-notif-tray__item-body">{n.body}</div>
-            <div className="kasm-notif-tray__item-time">
-              {formatTimeAgo(n.timestamp)}
-            </div>
-          </div>
-        ))}
+          )}
+        </For>
       </div>
     </div>
   );
@@ -80,9 +80,10 @@ function NotificationTray({ onClose }: { onClose: () => void }) {
 
 // Toast popup manager
 export function NotificationToasts() {
-  const [toasts, setToasts] = useState<Notification[]>([]);
+  const [toasts, setToasts] = createSignal<Notification[]>([]);
+  let prevIds: string[] = [];
 
-  const handleNotification = useCallback((notification: Notification) => {
+  function handleNotification(notification: Notification) {
     setToasts(prev => [notification, ...prev].slice(0, 5));
     const duration = notification.duration ?? (notification.urgency === 'critical' ? 8000 : 4000);
     if (duration > 0) {
@@ -90,53 +91,37 @@ export function NotificationToasts() {
         setToasts(prev => prev.filter(t => t.id !== notification.id));
       }, duration);
     }
-  }, []);
+  }
 
-  const prevNotifications = useRef<Notification[]>([]);
-  const notifications = useDesktopStore(s => s.notifications);
-
-  useEffect(() => {
-    // Detect newly added notifications by comparing with previous snapshot
-    const prev = prevNotifications.current;
-    if (notifications.length > prev.length) {
-      const newOnes = notifications.filter(n => !prev.some(p => p.id === n.id));
-      newOnes.forEach(n => handleNotification(n));
-    }
-    prevNotifications.current = notifications;
-  }, [notifications, handleNotification]);
-
-  if (toasts.length === 0) return null;
+  createEffect(() => {
+    const notifications = desktop.notifications;
+    const currentIds = notifications.map(n => n.id);
+    const newOnes = notifications.filter(n => !prevIds.includes(n.id));
+    newOnes.forEach(n => handleNotification(n));
+    prevIds = currentIds;
+  });
 
   return (
-    <div className="kasm-notif-toasts">
-      {toasts.map(toast => (
-        <div
-          key={toast.id}
-          className={`kasm-notif-toast kasm-notif-toast--${toast.urgency}`}
-        >
-          <div className="kasm-notif-toast__header">
-            {toast.icon && <span>{toast.icon}</span>}
-            <span className="kasm-notif-toast__title">{toast.title}</span>
-            <button
-              className="kasm-notif-toast__close"
-              onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
-            >
-              ✕
-            </button>
-          </div>
-          <div className="kasm-notif-toast__body">{toast.body}</div>
-        </div>
-      ))}
-    </div>
+    <Show when={toasts().length > 0}>
+      <div class="kasm-notif-toasts">
+        <For each={toasts()}>
+          {(toast) => (
+            <div class={`kasm-notif-toast kasm-notif-toast--${toast.urgency}`}>
+              <div class="kasm-notif-toast__header">
+                {toast.icon && <span>{toast.icon}</span>}
+                <span class="kasm-notif-toast__title">{toast.title}</span>
+                <button
+                  class="kasm-notif-toast__close"
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                >
+                  {'\u2715'}
+                </button>
+              </div>
+              <div class="kasm-notif-toast__body">{toast.body}</div>
+            </div>
+          )}
+        </For>
+      </div>
+    </Show>
   );
-}
-
-function formatTimeAgo(ts: number): string {
-  const diff = Date.now() - ts;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hours = Math.floor(mins / 60);
-  if (hours < 24) return `${hours}h ago`;
-  return `${Math.floor(hours / 24)}d ago`;
 }

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kasm Bench – Runner</title>
+  <style>
+    :root { --bg: #0d1117; --surface: #161b22; --border: #30363d; --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff; --green: #3fb950; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; }
+    #bar {
+      display: flex; align-items: center; gap: 0.75rem;
+      padding: 0.5rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border);
+      font-size: 0.85rem;
+    }
+    #bar .label { font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+    #bar .label.react { color: #61dafb; }
+    #bar .label.solid { color: var(--green); }
+    #status { color: var(--muted); flex: 1; }
+    #progress { width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    #progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
+    iframe { width: 100%; height: calc(100vh - 38px); border: none; }
+  </style>
+</head>
+<body>
+
+<div id="bar">
+  <span id="fw-label" class="label">...</span>
+  <span id="status">Initializing...</span>
+  <div id="progress"><div id="progress-fill"></div></div>
+</div>
+<iframe id="app-frame"></iframe>
+
+<script>
+// -------------------------------------------------------
+// Single-framework benchmark runner
+// Loads one app at a time for fair measurement.
+// Results stored in localStorage, then redirects back.
+// -------------------------------------------------------
+const params = new URLSearchParams(location.search);
+const fw = params.get('fw'); // 'react' or 'solid'
+const returnTo = params.get('return') || 'index.html';
+
+const frame = document.getElementById('app-frame');
+const statusEl = document.getElementById('status');
+const fwLabel = document.getElementById('fw-label');
+const progressFill = document.getElementById('progress-fill');
+
+if (!fw || !['react', 'solid'].includes(fw)) {
+  statusEl.textContent = 'Error: ?fw=react or ?fw=solid required';
+} else {
+  fwLabel.textContent = fw === 'react' ? 'React' : 'SolidJS';
+  fwLabel.classList.add(fw);
+  startBenchmark();
+}
+
+function setProgress(pct) { progressFill.style.width = pct + '%'; }
+function setStatus(msg) { statusEl.textContent = msg; }
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function waitForLoad(iframe) {
+  return new Promise(resolve => {
+    const check = () => {
+      try {
+        const doc = iframe.contentDocument || iframe.contentWindow.document;
+        if (doc.readyState === 'complete') return resolve();
+      } catch(e) {}
+      setTimeout(check, 50);
+    };
+    check();
+  });
+}
+
+// Measure interaction: action → double-rAF
+async function measureInteraction(iframe, actionFn) {
+  const win = iframe.contentWindow;
+  const t0 = win.performance.now();
+  actionFn(win, win.document);
+  await new Promise(r => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
+  return win.performance.now() - t0;
+}
+
+function findEl(doc, selector, fallbackText) {
+  let el = selector ? doc.querySelector(selector) : null;
+  if (!el && fallbackText) {
+    for (const node of doc.querySelectorAll('span, button, div, a')) {
+      if (node.textContent.trim() === fallbackText) { el = node; return el; }
+    }
+  }
+  return el;
+}
+
+async function clickAndMeasure(iframe, selector, fallbackText) {
+  const el = findEl(iframe.contentWindow.document, selector, fallbackText);
+  if (!el) return null;
+  return measureInteraction(iframe, (win) => {
+    el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+  });
+}
+
+async function typeAndMeasure(iframe, selector, text) {
+  const win = iframe.contentWindow;
+  const el = win.document.querySelector(selector);
+  if (!el) return null;
+  el.focus();
+  const times = [];
+  for (const ch of text) {
+    const t0 = win.performance.now();
+    el.dispatchEvent(new win.KeyboardEvent('keydown', { key: ch, bubbles: true }));
+    el.dispatchEvent(new win.KeyboardEvent('keypress', { key: ch, bubbles: true }));
+    el.value = (el.value || '') + ch;
+    el.dispatchEvent(new win.InputEvent('input', { data: ch, bubbles: true }));
+    el.dispatchEvent(new win.KeyboardEvent('keyup', { key: ch, bubbles: true }));
+    await new Promise(r => win.requestAnimationFrame(r));
+    times.push(win.performance.now() - t0);
+  }
+  return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+}
+
+async function dragAndMeasure(iframe, selector, dx, dy, steps) {
+  const win = iframe.contentWindow;
+  const el = win.document.querySelector(selector);
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  const sx = rect.left + rect.width / 2;
+  const sy = rect.top + 8;
+  const times = [];
+
+  el.dispatchEvent(new win.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+  for (let i = 1; i <= steps; i++) {
+    const t0 = win.performance.now();
+    win.document.dispatchEvent(new win.MouseEvent('mousemove', {
+      clientX: sx + (dx * i / steps), clientY: sy + (dy * i / steps), bubbles: true
+    }));
+    await new Promise(r => win.requestAnimationFrame(r));
+    times.push(win.performance.now() - t0);
+  }
+  win.document.dispatchEvent(new win.MouseEvent('mouseup', {
+    clientX: sx + dx, clientY: sy + dy, bubbles: true
+  }));
+  return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+}
+
+function getLoadMetrics(iframe) {
+  const perf = iframe.contentWindow.performance;
+  const nav = perf.getEntriesByType('navigation')[0] || {};
+  const paints = {};
+  for (const e of perf.getEntriesByType('paint')) paints[e.name] = e.startTime;
+  return {
+    domInteractive: nav.domInteractive - nav.startTime,
+    domContentLoaded: nav.domContentLoadedEventEnd - nav.startTime,
+    firstPaint: paints['first-paint'] || null,
+    firstContentfulPaint: paints['first-contentful-paint'] || null,
+    fullLoad: nav.loadEventEnd - nav.startTime,
+    transferSize: nav.transferSize || null,
+  };
+}
+
+function getMemory(iframe) {
+  try {
+    const m = iframe.contentWindow.performance?.memory;
+    if (m) return { usedMB: +(m.usedJSHeapSize / 1048576).toFixed(2) };
+  } catch(e) {}
+  return null;
+}
+
+// -------------------------------------------------------
+// Main benchmark sequence
+// -------------------------------------------------------
+async function startBenchmark() {
+  const results = {};
+  const appUrl = fw === 'react' ? 'react/index.html' : 'solid/index.html';
+
+  // Record the precise time BEFORE we start loading the iframe
+  const loadStart = performance.now();
+
+  setStatus('Loading app...');
+  setProgress(5);
+  frame.src = appUrl;
+
+  await waitForLoad(frame);
+  const loadEnd = performance.now();
+  results['Cold Load (wall clock)'] = +(loadEnd - loadStart).toFixed(2);
+
+  // Collect navigation timing
+  const load = getLoadMetrics(frame);
+  results['DOM Interactive'] = +load.domInteractive.toFixed(2);
+  results['DOM Content Loaded'] = +load.domContentLoaded.toFixed(2);
+  if (load.firstPaint != null) results['First Paint'] = +load.firstPaint.toFixed(2);
+  if (load.firstContentfulPaint != null) results['First Contentful Paint'] = +load.firstContentfulPaint.toFixed(2);
+  results['Full Load'] = +load.fullLoad.toFixed(2);
+  if (load.transferSize != null) results['Transfer Size (KB)'] = +(load.transferSize / 1024).toFixed(1);
+
+  const mem0 = getMemory(frame);
+  if (mem0) results['JS Heap Baseline (MB)'] = mem0.usedMB;
+
+  setProgress(15);
+  setStatus('Loaded. Waiting for app to settle...');
+  await sleep(2000);
+  setProgress(20);
+
+  // --- Interactions ---
+
+  // 1. Open App Menu
+  setStatus('Opening app menu...');
+  const t1 = await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
+  if (t1 != null) results['Open App Menu'] = +t1.toFixed(2);
+  await sleep(400);
+  setProgress(30);
+
+  // 2. Category switch
+  setStatus('Switching category...');
+  const t2 = await clickAndMeasure(frame, '.kasm-app-menu__category:nth-child(3)', null);
+  if (t2 != null) results['Category Switch'] = +t2.toFixed(2);
+  await sleep(300);
+  setProgress(38);
+
+  // 3. Launch Terminal
+  setStatus('Launching Terminal...');
+  const t3 = await clickAndMeasure(frame, null, '\u2B1B');
+  if (t3 != null) results['Launch Terminal'] = +t3.toFixed(2);
+  await sleep(600);
+  setProgress(48);
+
+  // 4. Terminal typing
+  setStatus('Typing in terminal...');
+  const t4 = await typeAndMeasure(frame,
+    '.kasm-terminal__input, .kasm-terminal input, input[type="text"]',
+    'ls -la /home/user'
+  );
+  if (t4 != null) results['Keystroke Latency (avg)'] = +t4.toFixed(2);
+  await sleep(300);
+  setProgress(58);
+
+  // 5. Window drag
+  setStatus('Dragging window...');
+  const t5 = await dragAndMeasure(frame, '.kasm-window__titlebar, .kasm-window-header', 200, 100, 40);
+  if (t5 != null) results['Window Drag (avg/frame)'] = +t5.toFixed(2);
+  await sleep(300);
+  setProgress(68);
+
+  // 6. Open second app (Calculator)
+  setStatus('Opening calculator...');
+  await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
+  await sleep(400);
+  const t6 = await clickAndMeasure(frame, null, '\uD83D\uDD22');
+  if (t6 != null) results['Launch Calculator'] = +t6.toFixed(2);
+  await sleep(500);
+  setProgress(78);
+
+  // 7. Rapid calculator clicks
+  setStatus('Rapid button clicks...');
+  const doc = frame.contentWindow.document;
+  const allBtns = doc.querySelectorAll('button');
+  let digitBtns = Array.from(allBtns).filter(b => /^[0-9]$/.test(b.textContent.trim()));
+  if (digitBtns.length === 0) digitBtns = Array.from(allBtns).slice(0, 5);
+  const calcTimes = [];
+  for (let i = 0; i < Math.min(20, digitBtns.length * 4); i++) {
+    const btn = digitBtns[i % digitBtns.length];
+    const t = await measureInteraction(frame, (win) => {
+      btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+    calcTimes.push(t);
+  }
+  if (calcTimes.length) results['Calc Button Click (avg)'] = +(calcTimes.reduce((a,b)=>a+b,0) / calcTimes.length).toFixed(2);
+  setProgress(88);
+
+  // 8. Close window
+  setStatus('Closing window...');
+  const closeBtn = doc.querySelector('.kasm-window__close, [title="Close"]');
+  if (closeBtn) {
+    const t8 = await measureInteraction(frame, (win) => {
+      closeBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+    });
+    results['Close Window'] = +t8.toFixed(2);
+  }
+  await sleep(200);
+  setProgress(95);
+
+  // 9. Post-interaction memory
+  const mem1 = getMemory(frame);
+  if (mem1) results['JS Heap After (MB)'] = mem1.usedMB;
+
+  // Store results
+  localStorage.setItem('bench_' + fw, JSON.stringify({
+    framework: fw,
+    timestamp: Date.now(),
+    userAgent: navigator.userAgent,
+    results,
+  }));
+
+  setProgress(100);
+  setStatus('Done! Redirecting...');
+  await sleep(500);
+
+  // Redirect back to comparison page
+  location.href = returnTo;
+}
+</script>
+
+</body>
+</html>

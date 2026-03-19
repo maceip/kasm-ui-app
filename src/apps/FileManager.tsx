@@ -3,7 +3,7 @@
 // Full VFS integration with CRUD, drag-drop, preview, sorting
 // ============================================================
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { createSignal, createMemo, createEffect, onCleanup, Show, For, type JSX } from 'solid-js';
 import type { AppProps } from '../core/types';
 import './apps.css';
 import { vfs } from './vfs';
@@ -56,59 +56,70 @@ function getIcon(node: VFSNode): string {
 const HOME = '/home/kasm-user';
 
 export function FileManager({ windowId }: AppProps) {
-  const [path, setPath] = useState(HOME);
-  const [view, setView] = useState<'list' | 'grid'>('list');
-  const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [sortKey, setSortKey] = useState<SortKey>('name');
-  const [sortDir, setSortDir] = useState<SortDir>('asc');
-  const [previewFile, setPreviewFile] = useState<string | null>(null);
-  const [previewContent, setPreviewContent] = useState('');
-  const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
-  const [editingName, setEditingName] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState('');
-  const [clipboard, setClipboard] = useState<{ paths: string[]; op: 'copy' | 'cut' } | null>(null);
-  const [dragItem, setDragItem] = useState<string | null>(null);
-  const [refresh, setRefresh] = useState(0);
-  const editRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  const [path, setPath] = createSignal(HOME);
+  const [view, setView] = createSignal<'list' | 'grid'>('list');
+  const [search, setSearch] = createSignal('');
+  const [selected, setSelected] = createSignal<Set<string>>(new Set());
+  const [sortKey, setSortKey] = createSignal<SortKey>('name');
+  const [sortDir, setSortDir] = createSignal<SortDir>('asc');
+  const [previewFile, setPreviewFile] = createSignal<string | null>(null);
+  const [previewContent, setPreviewContent] = createSignal('');
+  const [contextMenu, setContextMenu] = createSignal<ContextMenu | null>(null);
+  const [editingName, setEditingName] = createSignal<string | null>(null);
+  const [editValue, setEditValue] = createSignal('');
+  const [clipboard, setClipboard] = createSignal<{ paths: string[]; op: 'copy' | 'cut' } | null>(null);
+  const [dragItem, setDragItem] = createSignal<string | null>(null);
+  const [refresh, setRefresh] = createSignal(0);
+  let editRef: HTMLInputElement | undefined;
+  let containerRef: HTMLDivElement | undefined;
 
-  const forceRefresh = useCallback(() => setRefresh(r => r + 1), []);
+  const forceRefresh = () => setRefresh(r => r + 1);
 
-  const files = useMemo(() => {
+  const files = createMemo(() => {
+    // track refresh signal
+    refresh();
     try {
-      return vfs.readDir(path);
+      return vfs.readDir(path());
     } catch {
       return [];
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [path, refresh]);
+  });
 
-  const relativePath = path.startsWith(HOME) ? path.substring(HOME.length) || '/' : path;
-  const breadcrumbs = relativePath === '/'
-    ? ['Home']
-    : ['Home', ...relativePath.split('/').filter(Boolean)];
+  const relativePath = createMemo(() => {
+    const p = path();
+    return p.startsWith(HOME) ? p.substring(HOME.length) || '/' : p;
+  });
 
-  const filtered = useMemo(() => {
-    let list = files;
-    if (search) {
-      list = list.filter(f => f.name.toLowerCase().includes(search.toLowerCase()));
+  const breadcrumbs = createMemo(() => {
+    const rp = relativePath();
+    return rp === '/'
+      ? ['Home']
+      : ['Home', ...rp.split('/').filter(Boolean)];
+  });
+
+  const filtered = createMemo(() => {
+    let list = files();
+    const s = search();
+    if (s) {
+      list = list.filter(f => f.name.toLowerCase().includes(s.toLowerCase()));
     }
     // Sort: folders first, then by sortKey
+    const sk = sortKey();
+    const sd = sortDir();
     list = [...list].sort((a, b) => {
       if (a.type === 'folder' && b.type !== 'folder') return -1;
       if (a.type !== 'folder' && b.type === 'folder') return 1;
       let cmp = 0;
-      if (sortKey === 'name') cmp = a.name.localeCompare(b.name);
-      else if (sortKey === 'size') cmp = a.size - b.size;
-      else if (sortKey === 'modified') cmp = a.modified.getTime() - b.modified.getTime();
-      return sortDir === 'asc' ? cmp : -cmp;
+      if (sk === 'name') cmp = a.name.localeCompare(b.name);
+      else if (sk === 'size') cmp = a.size - b.size;
+      else if (sk === 'modified') cmp = a.modified.getTime() - b.modified.getTime();
+      return sd === 'asc' ? cmp : -cmp;
     });
     return list;
-  }, [files, search, sortKey, sortDir]);
+  });
 
   const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
+    if (sortKey() === key) {
       setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortKey(key);
@@ -117,13 +128,14 @@ export function FileManager({ windowId }: AppProps) {
   };
 
   const sortIndicator = (key: SortKey) => {
-    if (sortKey !== key) return '';
-    return sortDir === 'asc' ? ' \u25B2' : ' \u25BC';
+    if (sortKey() !== key) return '';
+    return sortDir() === 'asc' ? ' \u25B2' : ' \u25BC';
   };
 
   const navigateTo = (file: VFSNode) => {
     if (file.type === 'folder') {
-      const newPath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
+      const p = path();
+      const newPath = p === '/' ? `/${file.name}` : `${p}/${file.name}`;
       setPath(newPath);
       setSearch('');
       setSelected(new Set());
@@ -135,7 +147,8 @@ export function FileManager({ windowId }: AppProps) {
   };
 
   const openPreview = (file: VFSNode) => {
-    const filePath = path === '/' ? `/${file.name}` : `${path}/${file.name}`;
+    const p = path();
+    const filePath = p === '/' ? `/${file.name}` : `${p}/${file.name}`;
     try {
       const content = vfs.readFile(filePath);
       setPreviewFile(filePath);
@@ -148,7 +161,7 @@ export function FileManager({ windowId }: AppProps) {
   const navigateToBreadcrumb = (idx: number) => {
     if (idx === 0) setPath(HOME);
     else {
-      const parts = relativePath.split('/').filter(Boolean);
+      const parts = relativePath().split('/').filter(Boolean);
       setPath(HOME + '/' + parts.slice(0, idx).join('/'));
     }
     setSelected(new Set());
@@ -156,14 +169,14 @@ export function FileManager({ windowId }: AppProps) {
   };
 
   const goUp = () => {
-    const parent = path.split('/').slice(0, -1).join('/') || '/';
+    const parent = path().split('/').slice(0, -1).join('/') || '/';
     setPath(parent);
     setSelected(new Set());
     setPreviewFile(null);
   };
 
-  const toggleSelect = (name: string, e: React.MouseEvent) => {
-    const newSel = new Set(selected);
+  const toggleSelect = (name: string, e: MouseEvent) => {
+    const newSel = new Set(selected());
     if (e.ctrlKey || e.metaKey) {
       if (newSel.has(name)) newSel.delete(name);
       else newSel.add(name);
@@ -174,7 +187,7 @@ export function FileManager({ windowId }: AppProps) {
     setSelected(newSel);
   };
 
-  const handleContextMenu = (e: React.MouseEvent, target: VFSNode | null) => {
+  const handleContextMenu = (e: MouseEvent, target: VFSNode | null) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ x: e.clientX, y: e.clientY, target });
@@ -184,13 +197,14 @@ export function FileManager({ windowId }: AppProps) {
 
   const createNewFolder = () => {
     closeContextMenu();
+    const p = path();
     let name = 'New Folder';
     let i = 1;
-    while (vfs.exists(`${path}/${name}`)) {
+    while (vfs.exists(`${p}/${name}`)) {
       name = `New Folder (${i++})`;
     }
     try {
-      vfs.mkdir(`${path}/${name}`);
+      vfs.mkdir(`${p}/${name}`);
       forceRefresh();
       setEditingName(name);
       setEditValue(name);
@@ -201,13 +215,14 @@ export function FileManager({ windowId }: AppProps) {
 
   const createNewFile = () => {
     closeContextMenu();
+    const p = path();
     let name = 'New File.txt';
     let i = 1;
-    while (vfs.exists(`${path}/${name}`)) {
+    while (vfs.exists(`${p}/${name}`)) {
       name = `New File (${i++}).txt`;
     }
     try {
-      vfs.writeFile(`${path}/${name}`, '');
+      vfs.writeFile(`${p}/${name}`, '');
       forceRefresh();
       setEditingName(name);
       setEditValue(name);
@@ -218,15 +233,17 @@ export function FileManager({ windowId }: AppProps) {
 
   const deleteSelected = () => {
     closeContextMenu();
-    const toDelete = contextMenu?.target
-      ? [contextMenu.target.name]
-      : Array.from(selected);
+    const cm = contextMenu();
+    const toDelete = cm?.target
+      ? [cm.target.name]
+      : Array.from(selected());
     if (toDelete.length === 0) return;
     const confirmed = window.confirm(`Delete ${toDelete.length} item(s)?`);
     if (!confirmed) return;
+    const p = path();
     for (const name of toDelete) {
       try {
-        vfs.rm(`${path}/${name}`, true);
+        vfs.rm(`${p}/${name}`, true);
       } catch (err: any) {
         console.error(err.message);
       }
@@ -240,19 +257,22 @@ export function FileManager({ windowId }: AppProps) {
     closeContextMenu();
     setEditingName(name);
     setEditValue(name);
-    setTimeout(() => editRef.current?.select(), 0);
+    setTimeout(() => editRef?.select(), 0);
   };
 
   const finishRename = () => {
-    if (!editingName || !editValue || editValue === editingName) {
+    const en = editingName();
+    const ev = editValue();
+    if (!en || !ev || ev === en) {
       setEditingName(null);
       return;
     }
+    const p = path();
     try {
-      vfs.mv(`${path}/${editingName}`, `${path}/${editValue}`);
-      const newSel = new Set(selected);
-      newSel.delete(editingName);
-      newSel.add(editValue);
+      vfs.mv(`${p}/${en}`, `${p}/${ev}`);
+      const newSel = new Set(selected());
+      newSel.delete(en);
+      newSel.add(ev);
       setSelected(newSel);
       forceRefresh();
     } catch (err: any) {
@@ -261,24 +281,27 @@ export function FileManager({ windowId }: AppProps) {
     setEditingName(null);
   };
 
-  const handleCopy = useCallback(() => {
-    if (selected.size > 0) {
+  const handleCopy = () => {
+    if (selected().size > 0) {
+      const p = path();
       setClipboard({
-        paths: Array.from(selected).map(n => `${path}/${n}`),
+        paths: Array.from(selected()).map(n => `${p}/${n}`),
         op: 'copy'
       });
     }
-  }, [selected, path]);
+  };
 
-  const handlePaste = useCallback(() => {
-    if (!clipboard) return;
-    for (const src of clipboard.paths) {
+  const handlePaste = () => {
+    const cb = clipboard();
+    if (!cb) return;
+    const p = path();
+    for (const src of cb.paths) {
       try {
         const srcNode = vfs.getNode(src);
         if (!srcNode) continue;
         let destName = srcNode.name;
         let i = 1;
-        while (vfs.exists(`${path}/${destName}`)) {
+        while (vfs.exists(`${p}/${destName}`)) {
           const dot = srcNode.name.lastIndexOf('.');
           if (dot > 0 && srcNode.type === 'file') {
             destName = `${srcNode.name.substring(0, dot)} (${i++})${srcNode.name.substring(dot)}`;
@@ -286,77 +309,82 @@ export function FileManager({ windowId }: AppProps) {
             destName = `${srcNode.name} (${i++})`;
           }
         }
-        vfs.cp(src, `${path}/${destName}`, true);
-        if (clipboard.op === 'cut') {
+        vfs.cp(src, `${p}/${destName}`, true);
+        if (cb.op === 'cut') {
           vfs.rm(src, true);
         }
       } catch (err: any) {
         console.error(err.message);
       }
     }
-    if (clipboard.op === 'cut') setClipboard(null);
+    if (cb.op === 'cut') setClipboard(null);
     forceRefresh();
-  }, [clipboard, path, forceRefresh]);
+  };
 
   // Keyboard shortcuts
-  useEffect(() => {
+  createEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === 'c') {
-        // Only intercept if we have selected files and focus is in the file manager
-        if (selected.size > 0 && containerRef.current?.contains(document.activeElement as Node)) {
+        if (selected().size > 0 && containerRef?.contains(document.activeElement as Node)) {
           e.preventDefault();
           handleCopy();
         }
       }
       if (e.ctrlKey && e.key === 'v') {
-        if (clipboard && containerRef.current?.contains(document.activeElement as Node)) {
+        if (clipboard() && containerRef?.contains(document.activeElement as Node)) {
           e.preventDefault();
           handlePaste();
         }
       }
       if (e.key === 'Delete') {
-        if (selected.size > 0 && containerRef.current?.contains(document.activeElement as Node)) {
+        if (selected().size > 0 && containerRef?.contains(document.activeElement as Node)) {
           deleteSelected();
         }
       }
       if (e.key === 'F2') {
-        if (selected.size === 1 && containerRef.current?.contains(document.activeElement as Node)) {
-          startRename(Array.from(selected)[0]);
+        if (selected().size === 1 && containerRef?.contains(document.activeElement as Node)) {
+          startRename(Array.from(selected())[0]);
         }
       }
     };
     window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    onCleanup(() => window.removeEventListener('keydown', handler));
   });
 
   // Close context menu on click outside
-  useEffect(() => {
-    if (contextMenu) {
+  createEffect(() => {
+    if (contextMenu()) {
       const handler = () => closeContextMenu();
       window.addEventListener('click', handler);
-      return () => window.removeEventListener('click', handler);
+      onCleanup(() => window.removeEventListener('click', handler));
     }
-  }, [contextMenu]);
+  });
 
   // Drag handlers
-  const handleDragStart = (e: React.DragEvent, name: string) => {
+  const handleDragStart = (e: DragEvent, name: string) => {
     setDragItem(name);
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', name);
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', name);
+    }
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOver = (e: DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
   };
 
-  const handleDrop = (e: React.DragEvent, targetName: string) => {
+  const handleDrop = (e: DragEvent, targetName: string) => {
     e.preventDefault();
-    if (!dragItem || dragItem === targetName) return;
-    const targetNode = files.find(f => f.name === targetName);
+    const di = dragItem();
+    if (!di || di === targetName) return;
+    const targetNode = files().find(f => f.name === targetName);
     if (!targetNode || targetNode.type !== 'folder') return;
+    const p = path();
     try {
-      vfs.mv(`${path}/${dragItem}`, `${path}/${targetName}/${dragItem}`);
+      vfs.mv(`${p}/${di}`, `${p}/${targetName}/${di}`);
       setSelected(new Set());
       forceRefresh();
     } catch (err: any) {
@@ -366,39 +394,39 @@ export function FileManager({ windowId }: AppProps) {
   };
 
   const renderName = (file: VFSNode) => {
-    if (editingName === file.name) {
+    if (editingName() === file.name) {
       return (
         <input
           ref={editRef}
-          className="kasm-fm__edit-input"
-          value={editValue}
-          onChange={e => setEditValue(e.target.value)}
+          class="kasm-fm__edit-input"
+          value={editValue()}
+          onInput={e => setEditValue(e.currentTarget.value)}
           onBlur={finishRename}
           onKeyDown={e => {
             if (e.key === 'Enter') finishRename();
             if (e.key === 'Escape') setEditingName(null);
           }}
-          autoFocus
+          autofocus
           onClick={e => e.stopPropagation()}
-          onDoubleClick={e => e.stopPropagation()}
+          onDblClick={e => e.stopPropagation()}
           style={{
-            background: 'rgba(255,255,255,0.1)',
-            border: '1px solid var(--kasm-accent, #6c5ce7)',
-            color: 'inherit',
-            fontFamily: 'inherit',
-            fontSize: 'inherit',
-            padding: '1px 4px',
-            borderRadius: 3,
-            outline: 'none',
-            width: '100%',
-            maxWidth: 200,
+            "background": 'rgba(255,255,255,0.1)',
+            "border": '1px solid var(--kasm-accent, #6c5ce7)',
+            "color": 'inherit',
+            "font-family": 'inherit',
+            "font-size": 'inherit',
+            "padding": '1px 4px',
+            "border-radius": '3px',
+            "outline": 'none',
+            "width": '100%',
+            "max-width": '200px',
           }}
         />
       );
     }
     return (
       <span
-        onDoubleClick={(e) => {
+        onDblClick={(e) => {
           if (file.type !== 'folder') {
             e.stopPropagation();
             startRename(file.name);
@@ -412,281 +440,289 @@ export function FileManager({ windowId }: AppProps) {
 
   return (
     <div
-      className="kasm-app kasm-file-manager"
+      class="kasm-app kasm-file-manager"
       ref={containerRef}
       tabIndex={0}
       onContextMenu={e => handleContextMenu(e, null)}
-      onClick={() => { if (!contextMenu) return; }}
+      onClick={() => { if (!contextMenu()) return; }}
     >
       {/* Toolbar */}
-      <div className="kasm-fm__toolbar">
+      <div class="kasm-fm__toolbar">
         <button
-          className="kasm-fm__nav-btn"
+          class="kasm-fm__nav-btn"
           onClick={goUp}
-          disabled={path === '/'}
+          disabled={path() === '/'}
           title="Go up"
         >
-          \u2190
+          {'\u2190'}
         </button>
         <button
-          className="kasm-fm__nav-btn"
+          class="kasm-fm__nav-btn"
           onClick={createNewFolder}
           title="New Folder"
-          style={{ fontSize: 12 }}
+          style={{ "font-size": "12px" }}
         >
           {'+\u{1F4C1}'}
         </button>
         <button
-          className="kasm-fm__nav-btn"
+          class="kasm-fm__nav-btn"
           onClick={createNewFile}
           title="New File"
-          style={{ fontSize: 12 }}
+          style={{ "font-size": "12px" }}
         >
           {'+\u{1F4C4}'}
         </button>
-        <div className="kasm-fm__breadcrumbs">
-          {breadcrumbs.map((crumb, i) => (
-            <span key={i}>
-              <button className="kasm-fm__breadcrumb" onClick={() => navigateToBreadcrumb(i)}>
-                {crumb}
-              </button>
-              {i < breadcrumbs.length - 1 && <span className="kasm-fm__separator">/</span>}
-            </span>
-          ))}
+        <div class="kasm-fm__breadcrumbs">
+          <For each={breadcrumbs()}>
+            {(crumb, i) => (
+              <span>
+                <button class="kasm-fm__breadcrumb" onClick={() => navigateToBreadcrumb(i())}>
+                  {crumb}
+                </button>
+                <Show when={i() < breadcrumbs().length - 1}>
+                  <span class="kasm-fm__separator">/</span>
+                </Show>
+              </span>
+            )}
+          </For>
         </div>
         <input
-          className="kasm-fm__search"
+          class="kasm-fm__search"
           placeholder="Search..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
+          value={search()}
+          onInput={e => setSearch(e.currentTarget.value)}
         />
-        <div className="kasm-fm__view-toggle">
-          <button className={view === 'list' ? 'active' : ''} onClick={() => setView('list')}>\u2630</button>
-          <button className={view === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>\u229E</button>
+        <div class="kasm-fm__view-toggle">
+          <button class={view() === 'list' ? 'active' : ''} onClick={() => setView('list')}>{'\u2630'}</button>
+          <button class={view() === 'grid' ? 'active' : ''} onClick={() => setView('grid')}>{'\u229E'}</button>
         </div>
       </div>
 
       {/* Main area with optional preview */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden', minHeight: 0 }}>
+      <div style={{ "display": "flex", "flex": "1", "overflow": "hidden", "min-height": "0" }}>
         {/* Content */}
-        <div className={`kasm-fm__content kasm-fm__content--${view}`} style={{ flex: 1 }}>
-          {view === 'list' ? (
-            <table className="kasm-fm__table">
+        <div class={`kasm-fm__content kasm-fm__content--${view()}`} style={{ "flex": "1" }}>
+          <Show when={view() === 'list'} fallback={
+            <div class="kasm-fm__grid">
+              <For each={filtered()}>
+                {(file) => (
+                  <div
+                    class="kasm-fm__grid-item"
+                    onDblClick={() => navigateTo(file)}
+                    onClick={e => toggleSelect(file.name, e)}
+                    onContextMenu={e => {
+                      if (!selected().has(file.name)) {
+                        setSelected(new Set([file.name]));
+                      }
+                      handleContextMenu(e, file);
+                    }}
+                    draggable={true}
+                    onDragStart={e => handleDragStart(e, file.name)}
+                    onDragOver={file.type === 'folder' ? handleDragOver : undefined}
+                    onDrop={file.type === 'folder' ? (e: DragEvent) => handleDrop(e, file.name) : undefined}
+                    style={{
+                      "background": selected().has(file.name)
+                        ? 'rgba(108, 92, 231, 0.2)'
+                        : undefined,
+                      "border-radius": "6px",
+                    }}
+                  >
+                    <span class="kasm-fm__grid-icon">{getIcon(file)}</span>
+                    <span class="kasm-fm__grid-name">{renderName(file)}</span>
+                  </div>
+                )}
+              </For>
+            </div>
+          }>
+            <table class="kasm-fm__table">
               <thead>
                 <tr>
-                  <th onClick={() => toggleSort('name')} style={{ cursor: 'pointer' }}>
+                  <th onClick={() => toggleSort('name')} style={{ "cursor": "pointer" }}>
                     Name{sortIndicator('name')}
                   </th>
-                  <th onClick={() => toggleSort('size')} style={{ cursor: 'pointer', width: 90 }}>
+                  <th onClick={() => toggleSort('size')} style={{ "cursor": "pointer", "width": "90px" }}>
                     Size{sortIndicator('size')}
                   </th>
-                  <th onClick={() => toggleSort('modified')} style={{ cursor: 'pointer', width: 110 }}>
+                  <th onClick={() => toggleSort('modified')} style={{ "cursor": "pointer", "width": "110px" }}>
                     Modified{sortIndicator('modified')}
                   </th>
                 </tr>
               </thead>
               <tbody>
-                {filtered.map(file => (
-                  <tr
-                    key={file.name}
-                    onDoubleClick={() => navigateTo(file)}
-                    onClick={e => toggleSelect(file.name, e)}
-                    onContextMenu={e => {
-                      if (!selected.has(file.name)) {
-                        setSelected(new Set([file.name]));
-                      }
-                      handleContextMenu(e, file);
-                    }}
-                    draggable
-                    onDragStart={e => handleDragStart(e, file.name)}
-                    onDragOver={file.type === 'folder' ? handleDragOver : undefined}
-                    onDrop={file.type === 'folder' ? (e) => handleDrop(e, file.name) : undefined}
-                    style={{
-                      background: selected.has(file.name)
-                        ? 'rgba(108, 92, 231, 0.2)'
-                        : undefined,
-                    }}
-                  >
-                    <td>
-                      <span className="kasm-fm__file-icon">{getIcon(file)}</span>
-                      {renderName(file)}
-                    </td>
-                    <td>{file.type === 'file' ? formatSize(file.size) : '--'}</td>
-                    <td>{formatDate(file.modified)}</td>
-                  </tr>
-                ))}
+                <For each={filtered()}>
+                  {(file) => (
+                    <tr
+                      onDblClick={() => navigateTo(file)}
+                      onClick={e => toggleSelect(file.name, e)}
+                      onContextMenu={e => {
+                        if (!selected().has(file.name)) {
+                          setSelected(new Set([file.name]));
+                        }
+                        handleContextMenu(e, file);
+                      }}
+                      draggable={true}
+                      onDragStart={e => handleDragStart(e, file.name)}
+                      onDragOver={file.type === 'folder' ? handleDragOver : undefined}
+                      onDrop={file.type === 'folder' ? (e: DragEvent) => handleDrop(e, file.name) : undefined}
+                      style={{
+                        "background": selected().has(file.name)
+                          ? 'rgba(108, 92, 231, 0.2)'
+                          : undefined,
+                      }}
+                    >
+                      <td>
+                        <span class="kasm-fm__file-icon">{getIcon(file)}</span>
+                        {renderName(file)}
+                      </td>
+                      <td>{file.type === 'file' ? formatSize(file.size) : '--'}</td>
+                      <td>{formatDate(file.modified)}</td>
+                    </tr>
+                  )}
+                </For>
               </tbody>
             </table>
-          ) : (
-            <div className="kasm-fm__grid">
-              {filtered.map(file => (
-                <div
-                  key={file.name}
-                  className="kasm-fm__grid-item"
-                  onDoubleClick={() => navigateTo(file)}
-                  onClick={e => toggleSelect(file.name, e)}
-                  onContextMenu={e => {
-                    if (!selected.has(file.name)) {
-                      setSelected(new Set([file.name]));
-                    }
-                    handleContextMenu(e, file);
-                  }}
-                  draggable
-                  onDragStart={e => handleDragStart(e, file.name)}
-                  onDragOver={file.type === 'folder' ? handleDragOver : undefined}
-                  onDrop={file.type === 'folder' ? (e) => handleDrop(e, file.name) : undefined}
-                  style={{
-                    background: selected.has(file.name)
-                      ? 'rgba(108, 92, 231, 0.2)'
-                      : undefined,
-                    borderRadius: 6,
-                  }}
-                >
-                  <span className="kasm-fm__grid-icon">{getIcon(file)}</span>
-                  <span className="kasm-fm__grid-name">{renderName(file)}</span>
-                </div>
-              ))}
-            </div>
-          )}
-          {filtered.length === 0 && (
-            <div className="kasm-fm__empty">No files found</div>
-          )}
+          </Show>
+          <Show when={filtered().length === 0}>
+            <div class="kasm-fm__empty">No files found</div>
+          </Show>
         </div>
 
         {/* Preview panel */}
-        {previewFile && (
+        <Show when={previewFile()}>
           <div
             style={{
-              width: 280,
-              flexShrink: 0,
-              borderLeft: '1px solid var(--kasm-surface-border, #333)',
-              display: 'flex',
-              flexDirection: 'column',
-              background: 'var(--kasm-surface-bg, #1a1a2e)',
+              "width": "280px",
+              "flex-shrink": "0",
+              "border-left": "1px solid var(--kasm-surface-border, #333)",
+              "display": "flex",
+              "flex-direction": "column",
+              "background": "var(--kasm-surface-bg, #1a1a2e)",
             }}
           >
             <div style={{
-              padding: '6px 10px',
-              borderBottom: '1px solid var(--kasm-surface-border, #333)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              fontSize: 12,
-              fontWeight: 600,
+              "padding": "6px 10px",
+              "border-bottom": "1px solid var(--kasm-surface-border, #333)",
+              "display": "flex",
+              "justify-content": "space-between",
+              "align-items": "center",
+              "font-size": "12px",
+              "font-weight": "600",
             }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {previewFile.split('/').pop()}
+              <span style={{ "overflow": "hidden", "text-overflow": "ellipsis", "white-space": "nowrap" }}>
+                {previewFile()!.split('/').pop()}
               </span>
               <button
                 onClick={() => setPreviewFile(null)}
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: 'inherit',
-                  cursor: 'pointer',
-                  fontSize: 14,
-                  padding: '0 4px',
-                  opacity: 0.6,
+                  "border": "none",
+                  "background": "transparent",
+                  "color": "inherit",
+                  "cursor": "pointer",
+                  "font-size": "14px",
+                  "padding": "0 4px",
+                  "opacity": "0.6",
                 }}
               >
-                \u2715
+                {'\u2715'}
               </button>
             </div>
             <pre style={{
-              flex: 1,
-              overflow: 'auto',
-              padding: '8px 10px',
-              fontSize: 11,
-              lineHeight: 1.5,
-              margin: 0,
-              whiteSpace: 'pre-wrap',
-              wordBreak: 'break-word',
-              fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+              "flex": "1",
+              "overflow": "auto",
+              "padding": "8px 10px",
+              "font-size": "11px",
+              "line-height": "1.5",
+              "margin": "0",
+              "white-space": "pre-wrap",
+              "word-break": "break-word",
+              "font-family": "'JetBrains Mono', 'Fira Code', monospace",
             }}>
-              {previewContent}
+              {previewContent()}
             </pre>
           </div>
-        )}
+        </Show>
       </div>
 
       {/* Status bar */}
-      <div className="kasm-fm__statusbar">
-        {filtered.length} items{selected.size > 0 ? ` \u00B7 ${selected.size} selected` : ''} \u00B7 {path}
-        {clipboard && ` \u00B7 ${clipboard.paths.length} in clipboard (${clipboard.op})`}
+      <div class="kasm-fm__statusbar">
+        {filtered().length} items{selected().size > 0 ? ` \u00B7 ${selected().size} selected` : ''} {'\u00B7'} {path()}
+        {clipboard() && ` \u00B7 ${clipboard()!.paths.length} in clipboard (${clipboard()!.op})`}
       </div>
 
       {/* Context menu */}
-      {contextMenu && (
-        <div
-          style={{
-            position: 'fixed',
-            left: contextMenu.x,
-            top: contextMenu.y,
-            background: 'var(--kasm-surface-bg, #1a1a2e)',
-            border: '1px solid var(--kasm-surface-border, #333)',
-            borderRadius: 6,
-            padding: '4px 0',
-            zIndex: 10000,
-            minWidth: 160,
-            boxShadow: '0 4px 16px rgba(0,0,0,0.4)',
-            fontSize: 12,
-          }}
-          onClick={e => e.stopPropagation()}
-        >
-          {contextMenu.target && (
-            <>
-              <CtxItem label="Open" onClick={() => { closeContextMenu(); if (contextMenu.target) navigateTo(contextMenu.target); }} />
-              {contextMenu.target.type === 'file' && (
-                <CtxItem label="Preview" onClick={() => { closeContextMenu(); if (contextMenu.target) openPreview(contextMenu.target); }} />
+      <Show when={contextMenu()}>
+        {(cm) => (
+          <div
+            style={{
+              "position": "fixed",
+              "left": `${cm().x}px`,
+              "top": `${cm().y}px`,
+              "background": "var(--kasm-surface-bg, #1a1a2e)",
+              "border": "1px solid var(--kasm-surface-border, #333)",
+              "border-radius": "6px",
+              "padding": "4px 0",
+              "z-index": "10000",
+              "min-width": "160px",
+              "box-shadow": "0 4px 16px rgba(0,0,0,0.4)",
+              "font-size": "12px",
+            }}
+            onClick={e => e.stopPropagation()}
+          >
+            <Show when={cm().target}>
+              {(target) => (
+                <>
+                  <CtxItem label="Open" onClick={() => { closeContextMenu(); navigateTo(target()); }} />
+                  <Show when={target().type === 'file'}>
+                    <CtxItem label="Preview" onClick={() => { closeContextMenu(); openPreview(target()); }} />
+                  </Show>
+                  <CtxItem label="Rename" onClick={() => { startRename(target().name); }} />
+                  <CtxItem label="Copy" onClick={() => {
+                    closeContextMenu();
+                    setClipboard({ paths: [`${path()}/${target().name}`], op: 'copy' });
+                  }} />
+                  <CtxItem label="Cut" onClick={() => {
+                    closeContextMenu();
+                    setClipboard({ paths: [`${path()}/${target().name}`], op: 'cut' });
+                  }} />
+                  <CtxDivider />
+                  <CtxItem label="Delete" onClick={deleteSelected} danger />
+                  <CtxDivider />
+                </>
               )}
-              <CtxItem label="Rename" onClick={() => { if (contextMenu.target) startRename(contextMenu.target.name); }} />
-              <CtxItem label="Copy" onClick={() => {
-                closeContextMenu();
-                if (contextMenu.target) {
-                  setClipboard({ paths: [`${path}/${contextMenu.target.name}`], op: 'copy' });
-                }
-              }} />
-              <CtxItem label="Cut" onClick={() => {
-                closeContextMenu();
-                if (contextMenu.target) {
-                  setClipboard({ paths: [`${path}/${contextMenu.target.name}`], op: 'cut' });
-                }
-              }} />
-              <CtxDivider />
-              <CtxItem label="Delete" onClick={deleteSelected} danger />
-              <CtxDivider />
-            </>
-          )}
-          <CtxItem label="New Folder" onClick={createNewFolder} />
-          <CtxItem label="New File" onClick={createNewFile} />
-          {clipboard && (
-            <CtxItem label={`Paste (${clipboard.paths.length})`} onClick={() => { closeContextMenu(); handlePaste(); }} />
-          )}
-          <CtxDivider />
-          <CtxItem label="Refresh" onClick={() => { closeContextMenu(); forceRefresh(); }} />
-        </div>
-      )}
+            </Show>
+            <CtxItem label="New Folder" onClick={createNewFolder} />
+            <CtxItem label="New File" onClick={createNewFile} />
+            <Show when={clipboard()}>
+              {(cb) => (
+                <CtxItem label={`Paste (${cb().paths.length})`} onClick={() => { closeContextMenu(); handlePaste(); }} />
+              )}
+            </Show>
+            <CtxDivider />
+            <CtxItem label="Refresh" onClick={() => { closeContextMenu(); forceRefresh(); }} />
+          </div>
+        )}
+      </Show>
     </div>
   );
 }
 
-function CtxItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }) {
+function CtxItem(props: { label: string; onClick: () => void; danger?: boolean }) {
   return (
     <div
-      onClick={onClick}
+      onClick={props.onClick}
       style={{
-        padding: '5px 16px',
-        cursor: 'pointer',
-        color: danger ? 'var(--kasm-danger)' : 'inherit',
+        "padding": "5px 16px",
+        "cursor": "pointer",
+        "color": props.danger ? 'var(--kasm-danger)' : 'inherit',
       }}
       onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
       onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
     >
-      {label}
+      {props.label}
     </div>
   );
 }
 
 function CtxDivider() {
-  return <div style={{ height: 1, background: 'rgba(255,255,255,0.08)', margin: '3px 0' }} />;
+  return <div style={{ "height": "1px", "background": "rgba(255,255,255,0.08)", "margin": "3px 0" }} />;
 }

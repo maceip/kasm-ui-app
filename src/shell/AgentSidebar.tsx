@@ -1,25 +1,26 @@
 // ============================================================
 // Agent Sidebar - Multi-agent orchestration panel
-// Desktop: wide sidebar | Foldable: rail | Mobile: FAB
-// Includes project switcher, agent list, 3D git blocks
 // ============================================================
 
-import { useState, useRef, useEffect, useCallback, useMemo, memo } from 'react';
-import { useDesktopStore } from '../core/store';
+import { createSignal, createMemo, createEffect, Show, For, type JSX } from 'solid-js';
+import {
+  desktop, createProject, setActiveProject, toggleAgentSidebar,
+  spawnAgent, setActiveAgent, removeAgent,
+} from '../core/store';
 import { SlidingPane } from '../components/SlidingPane';
 import type { Project, AgentSession, AgentBackend, AgentStatus, AgentTask, GitNode } from '../core/types';
 import './agentSidebar.css';
 
 // === Agent brand metadata ===
-const AGENT_BRANDS: Record<AgentBackend, { label: string; color: string; icon: React.ReactNode }> = {
-  'codex':        { label: 'Codex',       color: '#10a37f', icon: <OaiIcon /> },
-  'claude-code':  { label: 'Claude Code', color: '#d97706', icon: <AnthIcon /> },
-  'gemini-code':  { label: 'Gemini',      color: '#4285f4', icon: <GemIcon /> },
-  'cursor-agent': { label: 'Cursor',      color: '#a855f7', icon: <CurIcon /> },
-  'devin':        { label: 'Devin',       color: '#06b6d4', icon: <DevIcon /> },
-  'junie':        { label: 'Junie',       color: '#e34f82', icon: <JunIcon /> },
-  'cody':         { label: 'Cody',        color: '#ff5543', icon: <CodIcon /> },
-  'custom':       { label: 'Custom',      color: '#888',    icon: <span style={{fontSize:14}}>{'*'}</span> },
+const AGENT_BRANDS: Record<AgentBackend, { label: string; color: string; icon: () => JSX.Element }> = {
+  'codex':        { label: 'Codex',       color: '#10a37f', icon: OaiIcon },
+  'claude-code':  { label: 'Claude Code', color: '#d97706', icon: AnthIcon },
+  'gemini-code':  { label: 'Gemini',      color: '#4285f4', icon: GemIcon },
+  'cursor-agent': { label: 'Cursor',      color: '#a855f7', icon: CurIcon },
+  'devin':        { label: 'Devin',       color: '#06b6d4', icon: DevIcon },
+  'junie':        { label: 'Junie',       color: '#e34f82', icon: JunIcon },
+  'cody':         { label: 'Cody',        color: '#ff5543', icon: CodIcon },
+  'custom':       { label: 'Custom',      color: '#888',    icon: () => <span style={{"font-size": '14px'}}>{'*'}</span> },
 };
 
 // ============================================================
@@ -27,161 +28,157 @@ const AGENT_BRANDS: Record<AgentBackend, { label: string; color: string; icon: R
 // ============================================================
 
 export function AgentSidebar() {
-  const projects = useDesktopStore(s => s.projects);
-  const activeProjectId = useDesktopStore(s => s.activeProjectId);
-  const sidebarOpen = useDesktopStore(s => s.agentSidebarOpen);
-  const createProject = useDesktopStore(s => s.createProject);
-  const setActiveProject = useDesktopStore(s => s.setActiveProject);
-  const toggleAgentSidebar = useDesktopStore(s => s.toggleAgentSidebar);
-
-  const project = projects.find(p => p.id === activeProjectId) ?? null;
+  const project = () => desktop.projects.find(p => p.id === desktop.activeProjectId) ?? null;
 
   // Bootstrap a default project if none exist
-  useEffect(() => {
-    if (projects.length === 0) {
+  createEffect(() => {
+    if (desktop.projects.length === 0) {
       createProject('Default Project', '/home/kasm-user');
     }
-  }, [projects.length, createProject]);
+  });
 
-  const [spawnMenuOpen, setSpawnMenuOpen] = useState(false);
+  const [spawnMenuOpen, setSpawnMenuOpen] = createSignal(false);
 
   const handleSpawn = (backend: AgentBackend) => {
-    if (!activeProjectId) return;
-    useDesktopStore.getState().spawnAgent(activeProjectId, backend);
+    if (!desktop.activeProjectId) return;
+    spawnAgent(desktop.activeProjectId, backend);
     setSpawnMenuOpen(false);
   };
 
-  if (!sidebarOpen) {
-    return (
-      <button className="kasm-agent-sidebar__toggle" onClick={toggleAgentSidebar} title="Open agent panel">
-        <span className="kasm-agent-sidebar__toggle-icon">{'\u{1F916}'}</span>
-      </button>
-    );
-  }
-
   return (
-    <div className="kasm-agent-sidebar">
-      {/* Header with project switcher */}
-      <div className="kasm-agent-sidebar__header">
-        <button className="kasm-agent-sidebar__collapse" onClick={toggleAgentSidebar} title="Collapse">
-          {'\u25C0'}
-        </button>
-        <ProjectSwitcher projects={projects} activeId={activeProjectId} onSelect={setActiveProject} onCreate={createProject} />
-      </div>
-
-      {/* Git 3D Blocks visualization */}
-      {project && (
-        <GitBlocks nodes={project.gitNodes} agents={project.agents} />
-      )}
-
-      {/* Agent list */}
-      <div className="kasm-agent-sidebar__agents">
-        <div className="kasm-agent-sidebar__section-header">
-          <span>Agents</span>
-          <span className="kasm-agent-sidebar__agent-count">
-            {project ? `${project.agents.filter(a => a.status === 'working').length}/${project.agents.length}` : '0/0'}
-          </span>
-        </div>
-
-        {project?.agents.map(agent => (
-          <AgentCard
-            key={agent.id}
-            agent={agent}
-            isActive={project.activeAgentId === agent.id}
-            onFocus={() => activeProjectId && useDesktopStore.getState().setActiveAgent(activeProjectId, agent.id)}
-            onRemove={() => activeProjectId && useDesktopStore.getState().removeAgent(activeProjectId, agent.id)}
-          />
-        ))}
-
-        {/* Spawn button */}
-        <div className="kasm-agent-sidebar__spawn-wrap">
-          <button
-            className="kasm-agent-sidebar__spawn-btn"
-            onClick={() => setSpawnMenuOpen(!spawnMenuOpen)}
-          >
-            + Spawn Agent
+    <Show when={desktop.agentSidebarOpen} fallback={
+      <button class="kasm-agent-sidebar__toggle" onClick={() => toggleAgentSidebar()} title="Open agent panel">
+        <span class="kasm-agent-sidebar__toggle-icon">{'\u{1F916}'}</span>
+      </button>
+    }>
+      <div class="kasm-agent-sidebar">
+        <div class="kasm-agent-sidebar__header">
+          <button class="kasm-agent-sidebar__collapse" onClick={() => toggleAgentSidebar()} title="Collapse">
+            {'\u25C0'}
           </button>
-          {spawnMenuOpen && (
-            <div className="kasm-agent-sidebar__spawn-menu">
-              {(Object.keys(AGENT_BRANDS) as AgentBackend[]).map(backend => (
-                <button
-                  key={backend}
-                  className="kasm-agent-sidebar__spawn-option"
-                  onClick={() => handleSpawn(backend)}
-                >
-                  <span className="kasm-agent-sidebar__spawn-option-icon">{AGENT_BRANDS[backend].icon}</span>
-                  <span>{AGENT_BRANDS[backend].label}</span>
-                </button>
-              ))}
-            </div>
-          )}
+          <ProjectSwitcher
+            projects={desktop.projects as Project[]}
+            activeId={desktop.activeProjectId}
+            onSelect={setActiveProject}
+            onCreate={createProject}
+          />
         </div>
+
+        <Show when={project()}>
+          {(p) => <GitBlocks nodes={p().gitNodes} agents={p().agents} />}
+        </Show>
+
+        <div class="kasm-agent-sidebar__agents">
+          <div class="kasm-agent-sidebar__section-header">
+            <span>Agents</span>
+            <span class="kasm-agent-sidebar__agent-count">
+              {project() ? `${project()!.agents.filter(a => a.status === 'working').length}/${project()!.agents.length}` : '0/0'}
+            </span>
+          </div>
+
+          <For each={project()?.agents ?? []}>
+            {(agent) => (
+              <AgentCard
+                agent={agent}
+                isActive={project()?.activeAgentId === agent.id}
+                onFocus={() => desktop.activeProjectId && setActiveAgent(desktop.activeProjectId, agent.id)}
+                onRemove={() => desktop.activeProjectId && removeAgent(desktop.activeProjectId, agent.id)}
+              />
+            )}
+          </For>
+
+          <div class="kasm-agent-sidebar__spawn-wrap">
+            <button
+              class="kasm-agent-sidebar__spawn-btn"
+              onClick={() => setSpawnMenuOpen(!spawnMenuOpen())}
+            >
+              + Spawn Agent
+            </button>
+            <Show when={spawnMenuOpen()}>
+              <div class="kasm-agent-sidebar__spawn-menu">
+                <For each={Object.keys(AGENT_BRANDS) as AgentBackend[]}>
+                  {(backend) => (
+                    <button
+                      class="kasm-agent-sidebar__spawn-option"
+                      onClick={() => handleSpawn(backend)}
+                    >
+                      <span class="kasm-agent-sidebar__spawn-option-icon">{AGENT_BRANDS[backend].icon()}</span>
+                      <span>{AGENT_BRANDS[backend].label}</span>
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </div>
+
+        <Show when={project() && project()!.tasks.length > 0}>
+          <div class="kasm-agent-sidebar__tasks">
+            <div class="kasm-agent-sidebar__section-header">Tasks</div>
+            <For each={project()!.tasks.slice(0, 5)}>
+              {(task) => (
+                <div class={`kasm-agent-sidebar__task kasm-agent-sidebar__task--${task.status}`}>
+                  <StatusDot status={task.status === 'done' ? 'done' : task.status === 'in-progress' ? 'working' : 'idle'} />
+                  <span class="kasm-agent-sidebar__task-title">{task.title}</span>
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
+
+        <AgentDetailPane
+          agent={project()?.agents.find(a => a.id === project()?.activeAgentId) ?? null}
+          onClose={() => desktop.activeProjectId && setActiveAgent(desktop.activeProjectId, '')}
+        />
       </div>
-
-      {/* Task summary */}
-      {project && project.tasks.length > 0 && (
-        <div className="kasm-agent-sidebar__tasks">
-          <div className="kasm-agent-sidebar__section-header">Tasks</div>
-          {project.tasks.slice(0, 5).map(task => (
-            <div key={task.id} className={`kasm-agent-sidebar__task kasm-agent-sidebar__task--${task.status}`}>
-              <StatusDot status={task.status === 'done' ? 'done' : task.status === 'in-progress' ? 'working' : 'idle'} />
-              <span className="kasm-agent-sidebar__task-title">{task.title}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Agent detail sliding pane */}
-      <AgentDetailPane
-        agent={project?.agents.find(a => a.id === project?.activeAgentId) ?? null}
-        onClose={() => activeProjectId && useDesktopStore.getState().setActiveAgent(activeProjectId, '')}
-      />
-    </div>
+    </Show>
   );
 }
 
-function AgentDetailPane({ agent, onClose }: { agent: AgentSession | null; onClose: () => void }) {
-  const brand = agent ? AGENT_BRANDS[agent.backend] : null;
+function AgentDetailPane(props: { agent: AgentSession | null; onClose: () => void }) {
+  const brand = () => props.agent ? AGENT_BRANDS[props.agent.backend] : null;
   return (
     <SlidingPane
-      isOpen={!!agent}
+      isOpen={!!props.agent}
       from="left"
       width="280px"
-      title={agent?.name || ''}
-      subtitle={brand?.label}
-      onRequestClose={onClose}
+      title={props.agent?.name || ''}
+      subtitle={brand()?.label}
+      onRequestClose={props.onClose}
     >
-      {agent && (
-        <div style={{ padding: 16, fontSize: 12, color: 'var(--kasm-surface-text)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-            <span style={{ fontSize: 24 }}>{brand?.icon}</span>
-            <div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{agent.name}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'var(--kasm-text-muted)' }}>
-                <StatusDot status={agent.status} />
-                <span>{agent.status}</span>
+      <Show when={props.agent}>
+        {(agent) => (
+          <div style={{ padding: '16px', "font-size": '12px', color: 'var(--kasm-surface-text)' }}>
+            <div style={{ display: 'flex', "align-items": 'center', gap: '8px', "margin-bottom": '16px' }}>
+              <span style={{ "font-size": '24px' }}>{brand()?.icon()}</span>
+              <div>
+                <div style={{ "font-weight": 600, "font-size": '14px' }}>{agent().name}</div>
+                <div style={{ display: 'flex', "align-items": 'center', gap: '4px', color: 'var(--kasm-text-muted)' }}>
+                  <StatusDot status={agent().status} />
+                  <span>{agent().status}</span>
+                </div>
               </div>
             </div>
+            <div style={{ display: 'flex', "flex-direction": 'column', gap: '8px' }}>
+              <DetailRow label="Backend" value={brand()?.label || agent().backend} />
+              <DetailRow label="Branch" value={agent().branch || 'none'} />
+              <DetailRow label="Tokens" value={`${agent().tokensUsed.toLocaleString()}`} />
+              <DetailRow label="Cost" value={`$${agent().costUsd.toFixed(4)}`} />
+              <DetailRow label="Created" value={new Date(agent().createdAt).toLocaleTimeString()} />
+              <DetailRow label="Last active" value={new Date(agent().lastActivity).toLocaleTimeString()} />
+            </div>
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <DetailRow label="Backend" value={brand?.label || agent.backend} />
-            <DetailRow label="Branch" value={agent.branch || 'none'} />
-            <DetailRow label="Tokens" value={`${agent.tokensUsed.toLocaleString()}`} />
-            <DetailRow label="Cost" value={`$${agent.costUsd.toFixed(4)}`} />
-            <DetailRow label="Created" value={new Date(agent.createdAt).toLocaleTimeString()} />
-            <DetailRow label="Last active" value={new Date(agent.lastActivity).toLocaleTimeString()} />
-          </div>
-        </div>
-      )}
+        )}
+      </Show>
     </SlidingPane>
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow(props: { label: string; value: string }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-      <span style={{ color: 'var(--kasm-text-muted)' }}>{label}</span>
-      <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11 }}>{value}</span>
+    <div style={{ display: 'flex', "justify-content": 'space-between' }}>
+      <span style={{ color: 'var(--kasm-text-muted)' }}>{props.label}</span>
+      <span style={{ "font-family": "'JetBrains Mono', monospace", "font-size": '11px' }}>{props.value}</span>
     </div>
   );
 }
@@ -191,36 +188,37 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 // ============================================================
 
 export function AgentFAB() {
-  const [expanded, setExpanded] = useState(false);
-  const projects = useDesktopStore(s => s.projects);
-  const activeProjectId = useDesktopStore(s => s.activeProjectId);
-  const project = projects.find(p => p.id === activeProjectId);
+  const [expanded, setExpanded] = createSignal(false);
+  const project = () => desktop.projects.find(p => p.id === desktop.activeProjectId);
 
   return (
-    <div className={`kasm-agent-fab ${expanded ? 'kasm-agent-fab--expanded' : ''}`}>
-      {expanded && project?.agents.map((agent, i) => (
-        <button
-          key={agent.id}
-          className="kasm-agent-fab__agent"
-          style={{
-            '--fab-offset': `${(i + 1) * 52}px`,
-            borderColor: AGENT_BRANDS[agent.backend]?.color,
-          } as React.CSSProperties}
-          onClick={() => {
-            if (activeProjectId) useDesktopStore.getState().setActiveAgent(activeProjectId, agent.id);
-            setExpanded(false);
-          }}
-          title={agent.name}
-        >
-          <StatusDot status={agent.status} />
-          {AGENT_BRANDS[agent.backend]?.icon}
-        </button>
-      ))}
+    <div class={`kasm-agent-fab ${expanded() ? 'kasm-agent-fab--expanded' : ''}`}>
+      <Show when={expanded()}>
+        <For each={project()?.agents ?? []}>
+          {(agent, i) => (
+            <button
+              class="kasm-agent-fab__agent"
+              style={{
+                '--fab-offset': `${(i() + 1) * 52}px`,
+                "border-color": AGENT_BRANDS[agent.backend]?.color,
+              } as JSX.CSSProperties}
+              onClick={() => {
+                if (desktop.activeProjectId) setActiveAgent(desktop.activeProjectId, agent.id);
+                setExpanded(false);
+              }}
+              title={agent.name}
+            >
+              <StatusDot status={agent.status} />
+              {AGENT_BRANDS[agent.backend]?.icon()}
+            </button>
+          )}
+        </For>
+      </Show>
       <button
-        className="kasm-agent-fab__main"
-        onClick={() => setExpanded(!expanded)}
+        class="kasm-agent-fab__main"
+        onClick={() => setExpanded(!expanded())}
       >
-        {expanded ? '\u2715' : '\u{1F916}'}
+        {expanded() ? '\u2715' : '\u{1F916}'}
       </button>
     </div>
   );
@@ -230,110 +228,109 @@ export function AgentFAB() {
 // Sub-components
 // ============================================================
 
-function ProjectSwitcher({ projects, activeId, onSelect, onCreate }: {
+function ProjectSwitcher(props: {
   projects: Project[];
   activeId: string | null;
   onSelect: (id: string) => void;
   onCreate: (name: string, path: string) => string;
 }) {
-  const [open, setOpen] = useState(false);
-  const active = projects.find(p => p.id === activeId);
+  const [open, setOpen] = createSignal(false);
+  const active = () => props.projects.find(p => p.id === props.activeId);
 
   return (
-    <div className="kasm-project-switcher">
-      <button className="kasm-project-switcher__btn" onClick={() => setOpen(!open)}>
-        <span className="kasm-project-switcher__name">{active?.name || 'No project'}</span>
-        <span className="kasm-project-switcher__arrow">{open ? '\u25B4' : '\u25BE'}</span>
+    <div class="kasm-project-switcher">
+      <button class="kasm-project-switcher__btn" onClick={() => setOpen(!open())}>
+        <span class="kasm-project-switcher__name">{active()?.name || 'No project'}</span>
+        <span class="kasm-project-switcher__arrow">{open() ? '\u25B4' : '\u25BE'}</span>
       </button>
-      {open && (
-        <div className="kasm-project-switcher__dropdown">
-          {projects.map(p => (
-            <button
-              key={p.id}
-              className={`kasm-project-switcher__item ${p.id === activeId ? 'kasm-project-switcher__item--active' : ''}`}
-              onClick={() => { onSelect(p.id); setOpen(false); }}
-            >
-              {p.name}
-              <span className="kasm-project-switcher__item-agents">
-                {p.agents.length} agent{p.agents.length !== 1 ? 's' : ''}
-              </span>
-            </button>
-          ))}
+      <Show when={open()}>
+        <div class="kasm-project-switcher__dropdown">
+          <For each={props.projects}>
+            {(p) => (
+              <button
+                class={`kasm-project-switcher__item ${p.id === props.activeId ? 'kasm-project-switcher__item--active' : ''}`}
+                onClick={() => { props.onSelect(p.id); setOpen(false); }}
+              >
+                {p.name}
+                <span class="kasm-project-switcher__item-agents">
+                  {p.agents.length} agent{p.agents.length !== 1 ? 's' : ''}
+                </span>
+              </button>
+            )}
+          </For>
           <button
-            className="kasm-project-switcher__item kasm-project-switcher__item--new"
+            class="kasm-project-switcher__item kasm-project-switcher__item--new"
             onClick={() => {
-              const name = `Project ${projects.length + 1}`;
-              onCreate(name, '/home/kasm-user');
+              const name = `Project ${props.projects.length + 1}`;
+              props.onCreate(name, '/home/kasm-user');
               setOpen(false);
             }}
           >
             + New Project
           </button>
         </div>
-      )}
+      </Show>
     </div>
   );
 }
 
-const AgentCard = memo(function AgentCard({ agent, isActive, onFocus, onRemove }: {
+function AgentCard(props: {
   agent: AgentSession;
   isActive: boolean;
   onFocus: () => void;
   onRemove: () => void;
 }) {
-  const brand = AGENT_BRANDS[agent.backend];
+  const brand = () => AGENT_BRANDS[props.agent.backend];
   return (
     <div
-      className={`kasm-agent-card ${isActive ? 'kasm-agent-card--active' : ''}`}
-      onClick={onFocus}
-      style={{ '--agent-color': brand?.color } as React.CSSProperties}
+      class={`kasm-agent-card ${props.isActive ? 'kasm-agent-card--active' : ''}`}
+      onClick={props.onFocus}
+      style={{ '--agent-color': brand()?.color } as JSX.CSSProperties}
     >
-      <div className="kasm-agent-card__icon">{brand?.icon}</div>
-      <div className="kasm-agent-card__info">
-        <div className="kasm-agent-card__name">{agent.name}</div>
-        <div className="kasm-agent-card__meta">
-          <StatusDot status={agent.status} />
-          <span>{agent.status}</span>
-          {agent.tokensUsed > 0 && <span className="kasm-agent-card__tokens">{(agent.tokensUsed / 1000).toFixed(1)}k tok</span>}
+      <div class="kasm-agent-card__icon">{brand()?.icon()}</div>
+      <div class="kasm-agent-card__info">
+        <div class="kasm-agent-card__name">{props.agent.name}</div>
+        <div class="kasm-agent-card__meta">
+          <StatusDot status={props.agent.status} />
+          <span>{props.agent.status}</span>
+          {props.agent.tokensUsed > 0 && <span class="kasm-agent-card__tokens">{(props.agent.tokensUsed / 1000).toFixed(1)}k tok</span>}
         </div>
       </div>
       <button
-        className="kasm-agent-card__remove"
-        onClick={e => { e.stopPropagation(); onRemove(); }}
+        class="kasm-agent-card__remove"
+        onClick={e => { e.stopPropagation(); props.onRemove(); }}
         title="Remove agent"
       >
         {'\u2715'}
       </button>
     </div>
   );
-});
+}
 
-const StatusDot = memo(function StatusDot({ status }: { status: AgentStatus | AgentTask['status'] }) {
-  const cls =
-    status === 'working' || status === 'in-progress' ? 'kasm-status-dot--working' :
-    status === 'waiting' || status === 'assigned' ? 'kasm-status-dot--waiting' :
-    status === 'error' ? 'kasm-status-dot--error' :
-    status === 'done' ? 'kasm-status-dot--done' :
+function StatusDot(props: { status: AgentStatus | AgentTask['status'] }) {
+  const cls = () =>
+    props.status === 'working' || props.status === 'in-progress' ? 'kasm-status-dot--working' :
+    props.status === 'waiting' || props.status === 'assigned' ? 'kasm-status-dot--waiting' :
+    props.status === 'error' ? 'kasm-status-dot--error' :
+    props.status === 'done' ? 'kasm-status-dot--done' :
     '';
-  return <span className={`kasm-status-dot ${cls}`} />;
-});
+  return <span class={`kasm-status-dot ${cls()}`} />;
+}
 
 // ============================================================
 // 3D Git Blocks - CSS 3D isometric visualization
 // ============================================================
 
-function GitBlocks({ nodes, agents }: { nodes: GitNode[]; agents: AgentSession[] }) {
-  // Generate mock git state if no real nodes provided
-  const displayNodes = useMemo(() => {
-    if (nodes.length > 0) return nodes.slice(-12);
-    // Fake representative state from agent branches
+function GitBlocks(props: { nodes: GitNode[]; agents: AgentSession[] }) {
+  const displayNodes = createMemo(() => {
+    if (props.nodes.length > 0) return props.nodes.slice(-12);
     const now = Date.now();
     const mockNodes: GitNode[] = [
       { hash: 'main-1', short: 'abc1234', message: 'Initial commit', branch: 'main', isMerged: true, parentHashes: [], timestamp: now - 300000 },
       { hash: 'main-2', short: 'def5678', message: 'Add auth module', branch: 'main', isMerged: true, parentHashes: ['main-1'], timestamp: now - 200000 },
       { hash: 'main-3', short: 'ghi9012', message: 'Fix tests', branch: 'main', isMerged: true, parentHashes: ['main-2'], timestamp: now - 100000 },
     ];
-    agents.forEach((agent, i) => {
+    props.agents.forEach((agent, i) => {
       if (agent.branch || agent.status === 'working') {
         const branchName = agent.branch || `agent/${agent.name.toLowerCase().replace(/\s+/g, '-')}`;
         mockNodes.push({
@@ -343,58 +340,59 @@ function GitBlocks({ nodes, agents }: { nodes: GitNode[]; agents: AgentSession[]
           branch: branchName,
           isMerged: false,
           parentHashes: ['main-3'],
-          timestamp: now - (50000 * (agents.length - i)),
+          timestamp: now - (50000 * (props.agents.length - i)),
         });
       }
     });
     return mockNodes.slice(-12);
-  }, [nodes, agents]);
+  });
 
-  // Group by branch
-  const branches = useMemo(() => {
+  const branches = createMemo(() => {
     const map = new Map<string, GitNode[]>();
-    displayNodes.forEach(n => {
+    displayNodes().forEach(n => {
       const br = n.branch || 'main';
       if (!map.has(br)) map.set(br, []);
       map.get(br)!.push(n);
     });
     return Array.from(map.entries());
-  }, [displayNodes]);
+  });
 
   return (
-    <div className="kasm-git-blocks">
-      <div className="kasm-git-blocks__scene">
-        {branches.map(([branchName, branchNodes], branchIdx) => (
-          <div
-            key={branchName}
-            className="kasm-git-blocks__lane"
-            style={{ '--lane-idx': branchIdx } as React.CSSProperties}
-          >
-            <div className="kasm-git-blocks__branch-label">{branchName}</div>
-            {branchNodes.map((node, nodeIdx) => (
-              <div
-                key={node.hash}
-                className={`kasm-git-blocks__block ${node.isMerged ? 'kasm-git-blocks__block--merged' : 'kasm-git-blocks__block--unmerged'}`}
-                style={{
-                  '--node-idx': nodeIdx,
-                  '--branch-color': branchName === 'main' ? 'var(--kasm-success)' : `hsl(${branchIdx * 60 + 200}, 70%, 55%)`,
-                } as React.CSSProperties}
-                title={`${node.short}: ${node.message}`}
-              >
-                <div className="kasm-git-blocks__block-face kasm-git-blocks__block-face--front" />
-                <div className="kasm-git-blocks__block-face kasm-git-blocks__block-face--top" />
-                <div className="kasm-git-blocks__block-face kasm-git-blocks__block-face--right" />
-              </div>
-            ))}
-          </div>
-        ))}
+    <div class="kasm-git-blocks">
+      <div class="kasm-git-blocks__scene">
+        <For each={branches()}>
+          {([branchName, branchNodes], branchIdx) => (
+            <div
+              class="kasm-git-blocks__lane"
+              style={{ '--lane-idx': branchIdx() } as JSX.CSSProperties}
+            >
+              <div class="kasm-git-blocks__branch-label">{branchName}</div>
+              <For each={branchNodes}>
+                {(node, nodeIdx) => (
+                  <div
+                    class={`kasm-git-blocks__block ${node.isMerged ? 'kasm-git-blocks__block--merged' : 'kasm-git-blocks__block--unmerged'}`}
+                    style={{
+                      '--node-idx': nodeIdx(),
+                      '--branch-color': branchName === 'main' ? 'var(--kasm-success)' : `hsl(${branchIdx() * 60 + 200}, 70%, 55%)`,
+                    } as JSX.CSSProperties}
+                    title={`${node.short}: ${node.message}`}
+                  >
+                    <div class="kasm-git-blocks__block-face kasm-git-blocks__block-face--front" />
+                    <div class="kasm-git-blocks__block-face kasm-git-blocks__block-face--top" />
+                    <div class="kasm-git-blocks__block-face kasm-git-blocks__block-face--right" />
+                  </div>
+                )}
+              </For>
+            </div>
+          )}
+        </For>
       </div>
-      <div className="kasm-git-blocks__legend">
-        <span className="kasm-git-blocks__legend-item">
-          <span className="kasm-git-blocks__legend-block kasm-git-blocks__legend-block--merged" /> merged
+      <div class="kasm-git-blocks__legend">
+        <span class="kasm-git-blocks__legend-item">
+          <span class="kasm-git-blocks__legend-block kasm-git-blocks__legend-block--merged" /> merged
         </span>
-        <span className="kasm-git-blocks__legend-item">
-          <span className="kasm-git-blocks__legend-block kasm-git-blocks__legend-block--unmerged" /> pending
+        <span class="kasm-git-blocks__legend-item">
+          <span class="kasm-git-blocks__legend-block kasm-git-blocks__legend-block--unmerged" /> pending
         </span>
       </div>
     </div>
@@ -424,5 +422,5 @@ function JunIcon() {
   return <svg width="16" height="16" viewBox="0 0 24 24" fill="#e34f82"><path d="M2.35 24A2.35 2.35 0 0 1 0 21.65V10.99c0-1.32.54-2.62 1.47-3.56l5.97-5.96A5.01 5.01 0 0 1 10.99 0h10.67A2.35 2.35 0 0 1 24 2.35v10.66a5.06 5.06 0 0 1-1.47 3.55l-5.97 5.97A5.02 5.02 0 0 1 13.01 24H2.35Zm8.97-6.85H5.49v1.37h5.83v-1.37Z"/></svg>;
 }
 function CodIcon() {
-  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v8.5M12 13.5V22M2 12h8.5M13.5 12H22M4.93 4.93l6.01 6.01M13.06 13.06l6.01 6.01M19.07 4.93l-6.01 6.01M10.94 13.06l-6.01 6.01" stroke="#ff5543" strokeWidth="2.5" strokeLinecap="round"/></svg>;
+  return <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M12 2v8.5M12 13.5V22M2 12h8.5M13.5 12H22M4.93 4.93l6.01 6.01M13.06 13.06l6.01 6.01M19.07 4.93l-6.01 6.01M10.94 13.06l-6.01 6.01" stroke="#ff5543" stroke-width="2.5" stroke-linecap="round"/></svg>;
 }

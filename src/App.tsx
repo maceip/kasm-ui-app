@@ -3,7 +3,7 @@
 // Combines all systems into a unified desktop experience
 // ============================================================
 
-import { useEffect } from 'react';
+import { createEffect, onCleanup } from 'solid-js';
 import { ThemeProvider } from './theme/ThemeProvider';
 import { CollabProvider } from './collab/CollabProvider';
 import { Desktop } from './shell/Desktop';
@@ -13,90 +13,75 @@ import { NotificationToasts } from './shell/NotificationCenter';
 import { ExpoView } from './shell/ExpoView';
 import { HotCorners } from './shell/HotCorners';
 import { AgentSidebar, AgentFAB } from './shell/AgentSidebar';
-import { useDesktopStore } from './core/store';
-import { usePersistence } from './core/persistence';
+import {
+  desktop, addNotification, switchWorkspace, setExpoMode,
+} from './core/store';
+import { setupPersistence } from './core/persistence';
 import { vfs } from './apps/vfs';
 import './styles/global.css';
 
 export default function App() {
-  const panelConfig = useDesktopStore(s => s.panelConfig);
-
   // Set up layout persistence (auto-save/load)
-  usePersistence();
+  setupPersistence();
 
   // VFS: restore from OPFS on mount, auto-persist every 5s
-  useEffect(() => {
-    vfs.restoreState();
-    const stop = vfs.startAutoPersist(5000);
-    return stop;
-  }, []);
+  vfs.restoreState();
+  const stop = vfs.startAutoPersist(5000);
+  onCleanup(() => stop());
 
   // Expose panel config as CSS custom properties / data attributes
-  useEffect(() => {
-    document.documentElement.dataset.panelPosition = panelConfig.position;
-    document.documentElement.style.setProperty('--kasm-panel-h', `${panelConfig.height}px`);
-  }, [panelConfig.position, panelConfig.height]);
+  createEffect(() => {
+    document.documentElement.dataset.panelPosition = desktop.panelConfig.position;
+    document.documentElement.style.setProperty('--kasm-panel-h', `${desktop.panelConfig.height}px`);
+  });
 
   // Welcome notification on first load
-  useEffect(() => {
-    const store = useDesktopStore.getState();
-    const timer1 = setTimeout(() => {
-      store.addNotification({
-        title: 'Welcome to Kasm UI',
-        body: 'A bleeding-edge React desktop environment. Open the Apps menu to explore!',
-        icon: '\u25C6',
-        urgency: 'normal',
+  const timer1 = setTimeout(() => {
+    addNotification({
+      title: 'Welcome to Kasm UI',
+      body: 'A bleeding-edge SolidJS desktop environment. Open the Apps menu to explore!',
+      icon: '\u25C6',
+      urgency: 'normal',
+    });
+  }, 1500);
+
+  const timer2 = setTimeout(() => {
+    if ('showDirectoryPicker' in window) {
+      addNotification({
+        title: 'Connect a local folder',
+        body: 'Click the folder icon in the panel to give Kasm access to a local directory. Your files will appear in the File Manager.',
+        icon: '\u{1F4C2}',
+        urgency: 'low',
+        duration: 8000,
       });
-    }, 1500);
+    }
+  }, 4000);
 
-    const timer2 = setTimeout(() => {
-      if ('showDirectoryPicker' in window) {
-        store.addNotification({
-          title: 'Connect a local folder',
-          body: 'Click the folder icon in the panel to give Kasm access to a local directory. Your files will appear in the File Manager.',
-          icon: '\u{1F4C2}',
-          urgency: 'low',
-          duration: 8000,
-        });
-      }
-    }, 4000);
-
-    return () => { clearTimeout(timer1); clearTimeout(timer2); };
-  }, []);
+  onCleanup(() => { clearTimeout(timer1); clearTimeout(timer2); });
 
   // Keyboard shortcuts (Cinnamon-style)
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      const store = useDesktopStore.getState();
-
-      // Ctrl+Alt+Arrow for workspace switching
-      if (e.ctrlKey && e.altKey) {
-        const wsIdx = store.workspaces.findIndex(ws => ws.id === store.activeWorkspaceId);
-        if (e.key === 'ArrowRight' && wsIdx < store.workspaces.length - 1) {
-          store.switchWorkspace(store.workspaces[wsIdx + 1].id);
-          e.preventDefault();
-        } else if (e.key === 'ArrowLeft' && wsIdx > 0) {
-          store.switchWorkspace(store.workspaces[wsIdx - 1].id);
-          e.preventDefault();
-        }
-
-        // Ctrl+Alt+Up for Expo view
-        if (e.key === 'ArrowUp') {
-          store.setExpoMode(store.expoMode === 'expo' ? 'off' : 'expo');
-          e.preventDefault();
-        }
-
-        // Ctrl+Alt+Down for Scale view
-        if (e.key === 'ArrowDown') {
-          store.setExpoMode(store.expoMode === 'scale' ? 'off' : 'scale');
-          e.preventDefault();
-        }
+  const handler = (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.altKey) {
+      const wsIdx = desktop.workspaces.findIndex(ws => ws.id === desktop.activeWorkspaceId);
+      if (e.key === 'ArrowRight' && wsIdx < desktop.workspaces.length - 1) {
+        switchWorkspace(desktop.workspaces[wsIdx + 1].id);
+        e.preventDefault();
+      } else if (e.key === 'ArrowLeft' && wsIdx > 0) {
+        switchWorkspace(desktop.workspaces[wsIdx - 1].id);
+        e.preventDefault();
       }
-    };
-
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, []);
+      if (e.key === 'ArrowUp') {
+        setExpoMode(desktop.expoMode === 'expo' ? 'off' : 'expo');
+        e.preventDefault();
+      }
+      if (e.key === 'ArrowDown') {
+        setExpoMode(desktop.expoMode === 'scale' ? 'off' : 'scale');
+        e.preventDefault();
+      }
+    }
+  };
+  window.addEventListener('keydown', handler);
+  onCleanup(() => window.removeEventListener('keydown', handler));
 
   return (
     <ThemeProvider>

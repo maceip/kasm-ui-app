@@ -1,0 +1,66 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+env:
+  # Last commit with React before the SolidJS migration
+  REACT_COMMIT: 5491748110481b4b5355bfbe7ac574de36ce14f7
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history to checkout React commit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # --- Build SolidJS (current) ---
+      - run: npm ci
+      - run: npm run build
+
+      # --- Build React (from pre-migration commit) ---
+      - name: Build React version for benchmark
+        run: |
+          git worktree add /tmp/react-build ${{ env.REACT_COMMIT }}
+          cd /tmp/react-build
+          PUPPETEER_SKIP_DOWNLOAD=1 npm ci
+          npx vite build --base /kasm-ui-app/bench/react/ --outDir ${{ github.workspace }}/dist/bench/react
+
+      # --- Build SolidJS copy for benchmark ---
+      - name: Build SolidJS version for benchmark
+        run: npx vite build --base /kasm-ui-app/bench/solid/ --outDir /tmp/solid-bench
+      - run: cp -r /tmp/solid-bench/* dist/bench/solid/
+
+      - name: Cleanup worktree
+        run: git worktree remove --force /tmp/react-build || true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

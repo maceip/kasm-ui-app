@@ -3,40 +3,36 @@
 // Golden Layout theming approach via Cinnamon CSS variables
 // ============================================================
 
-import { useEffect, createContext, useContext } from 'react';
-import { useDesktopStore } from '../core/store';
+import { createEffect, createContext, useContext, type JSX } from 'solid-js';
+import { desktop } from '../core/store';
 import { themes } from './themes';
 import type { Theme } from '../core/types';
 
-const ThemeContext = createContext<Theme>(themes.dark);
+const ThemeContext = createContext<() => Theme>(() => themes.dark);
 
 export function useTheme(): Theme {
-  return useContext(ThemeContext);
+  return useContext(ThemeContext)();
 }
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const themeId = useDesktopStore(s => s.activeThemeId);
-  const theme = themes[themeId] ?? themes.dark;
+export function ThemeProvider(props: { children: JSX.Element }) {
+  const theme = () => themes[desktop.activeThemeId] ?? themes.dark;
 
-  useEffect(() => {
+  createEffect(() => {
+    const t = theme();
     const root = document.documentElement;
-    const { colors } = theme;
 
-    // Apply all theme colors as CSS custom properties
-    for (const [key, value] of Object.entries(colors)) {
+    for (const [key, value] of Object.entries(t.colors)) {
       root.style.setProperty(`--kasm-${camelToKebab(key)}`, value);
     }
-    root.style.setProperty('--kasm-border-radius', theme.borderRadius);
-    root.style.setProperty('--kasm-font-family', theme.fontFamily);
-    root.style.setProperty('--kasm-font-size', theme.fontSize);
-
-    // Set color-scheme for native elements
-    root.style.colorScheme = theme.isDark ? 'dark' : 'light';
-  }, [theme]);
+    root.style.setProperty('--kasm-border-radius', t.borderRadius);
+    root.style.setProperty('--kasm-font-family', t.fontFamily);
+    root.style.setProperty('--kasm-font-size', t.fontSize);
+    root.style.colorScheme = t.isDark ? 'dark' : 'light';
+  });
 
   return (
     <ThemeContext.Provider value={theme}>
-      {children}
+      {props.children}
     </ThemeContext.Provider>
   );
 }
