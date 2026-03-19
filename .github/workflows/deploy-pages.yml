@@ -37,16 +37,19 @@ jobs:
 
       # --- Build React (from pre-migration commit) ---
       - name: Build React version for benchmark
+        working-directory: /tmp
         run: |
-          git worktree add /tmp/react-build ${{ env.REACT_COMMIT }}
+          git -C ${{ github.workspace }} worktree add /tmp/react-build ${{ env.REACT_COMMIT }}
           cd /tmp/react-build
           PUPPETEER_SKIP_DOWNLOAD=1 npm ci
           npx vite build --base /kasm-ui-app/bench/react/ --outDir ${{ github.workspace }}/dist/bench/react
 
       # --- Build SolidJS copy for benchmark ---
       - name: Build SolidJS version for benchmark
-        run: npx vite build --base /kasm-ui-app/bench/solid/ --outDir /tmp/solid-bench
-      - run: cp -r /tmp/solid-bench/* dist/bench/solid/
+        run: |
+          npx vite build --base /kasm-ui-app/bench/solid/ --outDir /tmp/solid-bench
+          mkdir -p dist/bench/solid
+          cp -r /tmp/solid-bench/* dist/bench/solid/
 
       - name: Cleanup worktree
         run: git worktree remove --force /tmp/react-build || true
