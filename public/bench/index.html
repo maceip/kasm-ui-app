@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kasm UI – React vs SolidJS Benchmark</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --red: #f85149; --yellow: #d29922;
+      --react: #61dafb; --solid: #3fb950;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace; background: var(--bg); color: var(--text); }
+    a { color: var(--accent); }
+
+    .topbar {
+      display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+      padding: 0.75rem 1.5rem; border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+    .topbar h1 { font-size: 1.1rem; font-weight: 600; }
+    .tag { font-size: 0.7rem; background: var(--accent); color: #000; padding: 2px 8px; border-radius: 999px; font-weight: 700; }
+    .actions { margin-left: auto; display: flex; gap: 0.5rem; }
+    button {
+      padding: 0.5rem 1.25rem; border: none; border-radius: 6px;
+      font-weight: 700; font-size: 0.85rem; cursor: pointer;
+    }
+    .btn-primary { background: var(--green); color: #000; }
+    .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+    button:disabled { opacity: 0.4; cursor: not-allowed; }
+    button:hover:not(:disabled) { opacity: 0.85; }
+
+    .container { max-width: 960px; margin: 0 auto; padding: 1.5rem; }
+
+    .explanation {
+      background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+      padding: 1rem 1.25rem; margin-bottom: 1.5rem; font-size: 0.85rem; line-height: 1.7;
+      color: var(--muted);
+    }
+    .explanation strong { color: var(--text); }
+
+    .status-bar {
+      padding: 0.6rem 1rem; font-size: 0.8rem; color: var(--muted);
+      border: 1px solid var(--border); border-radius: 6px;
+      margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem;
+    }
+    .status-bar .dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .dot-idle { background: var(--muted); }
+    .dot-running { background: var(--yellow); animation: pulse 1s infinite; }
+    .dot-done { background: var(--green); }
+    @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .status-text { flex: 1; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; margin-bottom: 1rem; }
+    th, td { padding: 0.55rem 0.75rem; border: 1px solid var(--border); }
+    th { background: var(--surface); text-align: left; font-weight: 600; }
+    td { text-align: right; color: var(--muted); }
+    td:first-child { text-align: left; color: var(--text); font-weight: 500; }
+    .faster { color: var(--green); font-weight: 600; }
+    .slower { color: var(--red); font-weight: 500; }
+    .neutral { color: var(--muted); }
+    .col-react { color: var(--react); }
+    .col-solid { color: var(--solid); }
+    .winner-row td { background: rgba(63,185,80,0.05); }
+
+    .bar-chart { margin: 1.5rem 0; }
+    .bar-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.4rem 0; font-size: 0.8rem; }
+    .bar-label { width: 180px; text-align: right; flex-shrink: 0; }
+    .bar-track { flex: 1; height: 22px; background: var(--surface); border-radius: 4px; overflow: hidden; position: relative; display: flex; }
+    .bar-react { background: var(--react); height: 100%; opacity: 0.7; transition: width 0.5s; }
+    .bar-solid { background: var(--solid); height: 100%; opacity: 0.7; transition: width 0.5s; }
+    .bar-val { position: absolute; right: 6px; top: 2px; font-size: 0.7rem; color: var(--text); font-weight: 600; }
+
+    .section-title { font-size: 1rem; font-weight: 600; margin: 2rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+
+    .meta { font-size: 0.75rem; color: var(--muted); margin-top: 1rem; }
+
+    .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
+    .empty-state p { margin: 0.5rem 0; }
+
+    footer { margin-top: 2rem; padding: 1rem 0; border-top: 1px solid var(--border); text-align: center; color: var(--muted); font-size: 0.8rem; }
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <h1>Bench</h1>
+  <span class="tag">React vs SolidJS</span>
+  <div class="actions">
+    <button class="btn-secondary" onclick="clearResults()">Clear</button>
+    <button class="btn-primary" id="run-btn" onclick="startSequentialBenchmark()">Run Benchmark</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="explanation">
+    <strong>How it works:</strong> Each framework is benchmarked in complete isolation — React loads
+    first in a dedicated full-page runner, measures all interactions, then unloads. SolidJS runs
+    next under identical conditions. This ensures fair comparison of cold load, time-to-interactive,
+    and interaction latency without resource contention.
+  </div>
+
+  <div class="status-bar">
+    <div class="dot dot-idle" id="status-dot"></div>
+    <span class="status-text" id="status">Ready. Click "Run Benchmark" to start.</span>
+  </div>
+
+  <div id="results-area">
+    <!-- Populated by JS -->
+  </div>
+
+  <footer>
+    Kasm UI Benchmark &middot; <a href="../docs/">Docs</a> &middot; <a href="https://github.com/maceip/kasm-ui-app">GitHub</a>
+  </footer>
+
+</div>
+
+<script>
+const statusEl = document.getElementById('status');
+const statusDot = document.getElementById('status-dot');
+const resultsArea = document.getElementById('results-area');
+const runBtn = document.getElementById('run-btn');
+
+function setStatus(msg, state) {
+  statusEl.textContent = msg;
+  statusDot.className = 'dot dot-' + (state || 'idle');
+}
+
+function clearResults() {
+  localStorage.removeItem('bench_react');
+  localStorage.removeItem('bench_solid');
+  localStorage.removeItem('bench_phase');
+  renderResults();
+  setStatus('Results cleared. Ready to run.', 'idle');
+}
+
+// -------------------------------------------------------
+// Sequential orchestration
+//
+// Phase 1: Navigate to run.html?fw=react → it benchmarks React, stores in localStorage, redirects back
+// Phase 2: Navigate to run.html?fw=solid → same for SolidJS
+// Phase 3: Both results in localStorage → render comparison
+// -------------------------------------------------------
+function startSequentialBenchmark() {
+  // Check current phase
+  const phase = localStorage.getItem('bench_phase');
+
+  if (!phase) {
+    // Start fresh: clear old results, begin with React
+    localStorage.removeItem('bench_react');
+    localStorage.removeItem('bench_solid');
+    localStorage.setItem('bench_phase', 'react');
+    setStatus('Starting React benchmark...', 'running');
+    setTimeout(() => {
+      location.href = 'run.html?fw=react&return=index.html';
+    }, 300);
+  }
+}
+
+// On page load, check if we're mid-sequence
+(function checkPhase() {
+  const phase = localStorage.getItem('bench_phase');
+
+  if (phase === 'react') {
+    // React just finished, now run SolidJS
+    const reactData = localStorage.getItem('bench_react');
+    if (reactData) {
+      localStorage.setItem('bench_phase', 'solid');
+      setStatus('React done. Starting SolidJS benchmark...', 'running');
+      setTimeout(() => {
+        location.href = 'run.html?fw=solid&return=index.html';
+      }, 500);
+      return;
+    }
+  }
+
+  if (phase === 'solid') {
+    // SolidJS just finished — show results
+    localStorage.removeItem('bench_phase');
+    setStatus('Benchmark complete!', 'done');
+  }
+
+  renderResults();
+})();
+
+// -------------------------------------------------------
+// Render comparison
+// -------------------------------------------------------
+function renderResults() {
+  const reactRaw = localStorage.getItem('bench_react');
+  const solidRaw = localStorage.getItem('bench_solid');
+
+  if (!reactRaw && !solidRaw) {
+    resultsArea.innerHTML = `
+      <div class="empty-state">
+        <p style="font-size:1.5rem;">&#9202;</p>
+        <p>No benchmark data yet.</p>
+        <p>Click <strong>Run Benchmark</strong> to measure both frameworks sequentially.</p>
+      </div>`;
+    return;
+  }
+
+  const react = reactRaw ? JSON.parse(reactRaw) : null;
+  const solid = solidRaw ? JSON.parse(solidRaw) : null;
+
+  // Only one framework done so far
+  if (!react || !solid) {
+    const done = react || solid;
+    resultsArea.innerHTML = `
+      <div class="empty-state">
+        <p>Benchmarked <strong>${done.framework === 'react' ? 'React' : 'SolidJS'}</strong> — waiting for the other framework...</p>
+      </div>`;
+    return;
+  }
+
+  const rr = react.results;
+  const sr = solid.results;
+  const allKeys = [...new Set([...Object.keys(rr), ...Object.keys(sr)])];
+
+  // Separate load metrics from interaction metrics
+  const loadKeys = ['Cold Load (wall clock)', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)', 'JS Heap Baseline (MB)'];
+  const interactionKeys = allKeys.filter(k => !loadKeys.includes(k) && !k.includes('Heap After'));
+  const memKeys = allKeys.filter(k => k.includes('Heap'));
+
+  let html = '';
+
+  // Summary bar chart
+  html += '<h3 class="section-title">Visual Comparison</h3>';
+  html += '<div class="bar-chart">';
+  for (const key of allKeys) {
+    const rv = rr[key], sv = sr[key];
+    if (rv == null || sv == null || typeof rv !== 'number' || typeof sv !== 'number') continue;
+    const max = Math.max(rv, sv) || 1;
+    const rPct = (rv / max * 100).toFixed(1);
+    const sPct = (sv / max * 100).toFixed(1);
+    html += `
+      <div class="bar-row">
+        <div class="bar-label">${key}</div>
+        <div class="bar-track">
+          <div class="bar-react" style="width:${rPct}%"></div>
+          <div class="bar-val" style="left:4px;right:auto;color:var(--react)">${rv.toFixed(1)}</div>
+        </div>
+        <div class="bar-track">
+          <div class="bar-solid" style="width:${sPct}%"></div>
+          <div class="bar-val" style="left:4px;right:auto;color:var(--solid)">${sv.toFixed(1)}</div>
+        </div>
+      </div>`;
+  }
+  html += '<div style="display:flex;gap:1.5rem;justify-content:center;margin-top:0.5rem;font-size:0.75rem;">';
+  html += '<span style="color:var(--react);">&#9632; React</span>';
+  html += '<span style="color:var(--solid);">&#9632; SolidJS</span>';
+  html += '<span style="color:var(--muted);">(lower is better)</span>';
+  html += '</div></div>';
+
+  // Load metrics table
+  html += renderTable('Load Performance', loadKeys, rr, sr);
+
+  // Interaction metrics table
+  html += renderTable('Interaction Performance', interactionKeys, rr, sr);
+
+  // Memory table
+  if (memKeys.length) html += renderTable('Memory', memKeys, rr, sr);
+
+  // Meta
+  html += `<div class="meta">
+    Tested: ${new Date(react.timestamp).toLocaleString()}<br/>
+    UA: ${react.userAgent}
+  </div>`;
+
+  resultsArea.innerHTML = html;
+}
+
+function renderTable(title, keys, rr, sr) {
+  let html = `<h3 class="section-title">${title}</h3>`;
+  html += '<table><thead><tr><th>Metric</th><th class="col-react">React</th><th class="col-solid">SolidJS</th><th>Delta</th></tr></thead><tbody>';
+
+  let solidWins = 0, reactWins = 0;
+
+  for (const key of keys) {
+    const rv = rr[key], sv = sr[key];
+    if (rv == null && sv == null) continue;
+
+    const rStr = rv != null ? (typeof rv === 'number' ? rv.toFixed(2) : rv) : '\u2014';
+    const sStr = sv != null ? (typeof sv === 'number' ? sv.toFixed(2) : sv) : '\u2014';
+    const unit = key.includes('KB') ? ' KB' : key.includes('MB') ? ' MB' : ' ms';
+
+    let delta = '', cls = 'neutral', isWinner = false;
+    if (typeof rv === 'number' && typeof sv === 'number' && rv > 0) {
+      const pct = ((rv - sv) / rv * 100);
+      if (pct > 3) {
+        cls = 'faster'; delta = `SolidJS ${pct.toFixed(0)}% faster`; solidWins++; isWinner = true;
+      } else if (pct < -3) {
+        cls = 'slower'; delta = `React ${(-pct).toFixed(0)}% faster`; reactWins++;
+      } else {
+        delta = '~same';
+      }
+    }
+
+    html += `<tr${isWinner ? ' class="winner-row"' : ''}>
+      <td>${key}</td>
+      <td>${rStr}${rv != null ? unit : ''}</td>
+      <td>${sStr}${sv != null ? unit : ''}</td>
+      <td class="${cls}">${delta}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  return html;
+}
+</script>
+
+</body>
+</html>
