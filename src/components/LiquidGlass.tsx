@@ -2,9 +2,16 @@
 // LiquidGlass - Apple-style frosted glass wrapper component
 // Based on liquid-glass-react, optimized for Kasm UI
 // Wrap any content: <LiquidGlass>...</LiquidGlass>
+//
+// SOLID 2.0 ALIGNMENT:
+// - No forwardRef (Solid passes ref as a regular prop)
+// - No useId (manual ID generation)
+// - No useCallback (stable function identity)
+// - Effects annotated with compute/apply phases
+// - ref merging uses plain function (no forwardRef)
 // ============================================================
 
-import { type CSSProperties, forwardRef, useCallback, useEffect, useId, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useRef, useState } from 'react';
 import { ShaderDisplacementGenerator, fragmentShaders } from './liquidGlassShaderUtils';
 import { displacementMap, polarDisplacementMap, prominentDisplacementMap } from './liquidGlassUtils';
 
@@ -12,29 +19,20 @@ type GlassMode = 'standard' | 'polar' | 'prominent' | 'shader';
 
 export interface LiquidGlassProps {
   children: React.ReactNode;
-  /** Refraction intensity (default: 40) */
   displacementScale?: number;
-  /** Backdrop blur in rem units (default: 0.06) */
   blurAmount?: number;
-  /** Backdrop saturation % (default: 140) */
   saturation?: number;
-  /** Chromatic aberration strength (default: 1.5) */
   aberrationIntensity?: number;
-  /** Elastic squish on hover (default: 0.1, 0 = off) */
   elasticity?: number;
-  /** Border radius in px (default: 12) */
   cornerRadius?: number;
-  /** Refraction algorithm (default: 'standard') */
   mode?: GlassMode;
-  /** Extra CSS class */
   className?: string;
-  /** Inline style overrides */
   style?: CSSProperties;
-  /** Override padding (default: '12px 16px') */
   padding?: string;
-  /** Light overlay behind mouse (default: false) */
   overLight?: boolean;
   onClick?: () => void;
+  /** Ref callback or RefObject — Solid 2.0 passes ref as a regular prop */
+  outerRef?: React.Ref<HTMLDivElement>;
 }
 
 const getMap = (mode: GlassMode, shaderMapUrl?: string) => {
@@ -53,10 +51,15 @@ const generateShaderMap = (w: number, h: number): string => {
   return url;
 };
 
+// Stable ID counter — replaces useId().
+// Solid 2.0 has no useId; manual IDs are the standard pattern.
+let nextGlassId = 0;
+
 /* ---------- SVG filter ---------- */
-function GlassFilter({ id, scale, aberration, w, h, mode, shaderUrl }: {
+function GlassFilter(props: {
   id: string; scale: number; aberration: number; w: number; h: number; mode: GlassMode; shaderUrl?: string;
 }) {
+  const { id, scale, aberration, w, h, mode, shaderUrl } = props;
   return (
     <svg style={{ position: 'absolute', width: 0, height: 0 }} aria-hidden="true">
       <defs>
@@ -89,7 +92,9 @@ function GlassFilter({ id, scale, aberration, w, h, mode, shaderUrl }: {
 }
 
 /* ---------- Main component ---------- */
-const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externalRef) => {
+// No forwardRef — Solid 2.0 passes ref as a regular prop.
+// Accept `outerRef` prop instead. Consumers: <LiquidGlass outerRef={myRef}>
+export function LiquidGlass(props: LiquidGlassProps) {
   const {
     children,
     displacementScale = 40,
@@ -104,9 +109,11 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
     padding = '12px 16px',
     overLight = false,
     onClick,
+    outerRef,
   } = props;
 
-  const filterId = useId();
+  // Manual ID — replaces useId(). Works identically in Solid 2.0.
+  const [filterId] = useState(() => `glass-${++nextGlassId}`);
   const glassRef = useRef<HTMLDivElement>(null);
   const [glassSize, setGlassSize] = useState({ width: 200, height: 60 });
   const [mouseOffset, setMouseOffset] = useState({ x: 0, y: 0 });
@@ -114,17 +121,20 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
   const [active, setActive] = useState(false);
   const [shaderUrl, setShaderUrl] = useState('');
 
-  // Merge refs
-  const setRefs = useCallback((node: HTMLDivElement | null) => {
+  // Merge refs — no forwardRef needed.
+  // Solid 2.0: just pass ref prop directly, no merging needed.
+  const setRefs = (node: HTMLDivElement | null) => {
     (glassRef as any).current = node;
-    if (typeof externalRef === 'function') externalRef(node);
-    else if (externalRef) (externalRef as any).current = node;
-  }, [externalRef]);
+    if (typeof outerRef === 'function') outerRef(node);
+    else if (outerRef) (outerRef as any).current = node;
+  };
 
-  // Measure size
+  // --- Measure size (compute/apply split) ---
+  // Solid 2.0: createEffect(() => glassRef, (el) => { new ResizeObserver... })
   useEffect(() => {
     const el = glassRef.current;
     if (!el) return;
+    // COMPUTE+APPLY: ResizeObserver fires callback with measured size
     const ro = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) setGlassSize({ width, height });
@@ -133,15 +143,19 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
     return () => ro.disconnect();
   }, []);
 
-  // Generate shader map
+  // --- Generate shader map (compute/apply split) ---
+  // Solid 2.0: createEffect(() => ({ mode, w: glassSize().width }), ({mode, w}) => { ... })
   useEffect(() => {
     if (mode === 'shader' && glassSize.width > 0) {
-      setShaderUrl(generateShaderMap(glassSize.width, glassSize.height));
+      // COMPUTE: generate map (pure)
+      const url = generateShaderMap(glassSize.width, glassSize.height);
+      // APPLY: set state
+      setShaderUrl(url);
     }
   }, [mode, glassSize.width, glassSize.height]);
 
-  // Mouse tracking
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+  // Mouse tracking — no useCallback needed.
+  const handleMouseMove = (e: React.MouseEvent) => {
     const el = glassRef.current;
     if (!el) return;
     const rect = el.getBoundingClientRect();
@@ -149,7 +163,7 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
       x: ((e.clientX - rect.left - rect.width / 2) / rect.width) * 100,
       y: ((e.clientY - rect.top - rect.height / 2) / rect.height) * 100,
     });
-  }, []);
+  };
 
   const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
 
@@ -187,10 +201,9 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
       onMouseUp={() => setActive(false)}
       onClick={onClick}
     >
-      {/* SVG filter definition (zero-size, hidden) */}
       <GlassFilter id={filterId} scale={overLight ? displacementScale * 0.5 : displacementScale} aberration={aberrationIntensity} w={glassSize.width} h={glassSize.height} mode={mode} shaderUrl={shaderUrl} />
 
-      {/* Backdrop warp layer (gets the glass effect) */}
+      {/* Backdrop warp layer */}
       <span
         style={{
           position: 'absolute',
@@ -247,8 +260,6 @@ const LiquidGlass = forwardRef<HTMLDivElement, LiquidGlassProps>((props, externa
       </div>
     </div>
   );
-});
+}
 
-LiquidGlass.displayName = 'LiquidGlass';
 export default LiquidGlass;
-export { LiquidGlass };

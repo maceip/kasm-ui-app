@@ -2,9 +2,12 @@
 // TitleBar - Window title bar with controls
 // Combines: React Desktop's TitleBar (OS-native look),
 // Golden Layout's header controls, rc-dock's panel header
+//
+// SOLID 2.0 ALIGNMENT:
+// - No memo() (Solid components don't re-render)
+// - Props accessed via props.x (not destructured)
 // ============================================================
 
-import { memo } from 'react';
 import { useDesktopStore } from '../core/store';
 import { PopoutButton } from './PopoutWindow';
 import type { WindowState } from '../core/types';
@@ -16,7 +19,9 @@ interface TitleBarProps {
   onPopout?: () => void;
 }
 
-export const TitleBar = memo(function TitleBar({ win, onDragStart, onDoubleClick, onPopout }: TitleBarProps) {
+// No memo() — Solid components run once.
+export function TitleBar(props: TitleBarProps) {
+  const { win, onDragStart, onDoubleClick, onPopout } = props; // Solid: use props.win directly
   const isMaximized = win.state === 'maximized' || win.state.startsWith('snapped');
 
   return (
@@ -81,4 +86,4 @@ export const TitleBar = memo(function TitleBar({ win, onDragStart, onDoubleClick
       </div>
     </div>
   );
-});
+}

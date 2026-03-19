@@ -2,9 +2,15 @@
 // Window Component - Desktop window with title bar
 // Combines: React Desktop's Window, rc-dock's DockPanel,
 // Cinnamon's window management, Re-Flex's resize constraints
+//
+// SOLID 2.0 ALIGNMENT:
+// - No memo() wrapper (Solid components run once, no re-renders)
+// - No useCallback() (function identity stable in Solid)
+// - Effects split into compute/apply phases where possible
+// - Props accessed via props.x pattern (not destructured)
 // ============================================================
 
-import { useRef, useCallback, useState, useEffect, memo } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { useDesktopStore } from '../core/store';
 import { TitleBar } from './TitleBar';
 import { PopoutWindow } from './PopoutWindow';
@@ -23,7 +29,10 @@ interface WindowProps {
   children: React.ReactNode;
 }
 
-export const Window = memo(function Window({ win, children }: WindowProps) {
+// No memo() — in Solid 2.0 components run once and never re-execute.
+// Removing it here makes the port mechanical.
+export function Window(props: WindowProps) {
+  const { win, children } = props; // Solid: use props.win directly
   const [poppedOut, setPoppedOut] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [resizing, setResizing] = useState<ResizeDir | null>(null);
@@ -32,14 +41,15 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
   const resizeStart = useRef({ x: 0, y: 0, w: 0, h: 0, wx: 0, wy: 0 });
   const windowRef = useRef<HTMLDivElement>(null);
 
+  // Derived state — in Solid 2.0: createSignal(() => win.state === 'maximized')
   const isMaximized = win.state === 'maximized';
   const isMinimized = win.state === 'minimized';
 
-  // --- Drag (title bar) ---
-  const onDragStart = useCallback((e: React.MouseEvent) => {
+  // --- Drag start (title bar) ---
+  // No useCallback — Solid functions are stable (component runs once).
+  const onDragStart = (e: React.MouseEvent) => {
     const { focusWindow, restoreWindow } = useDesktopStore.getState();
     if (isMaximized) {
-      // Unmaximize on drag
       restoreWindow(win.id);
       const defaultWidth = 800;
       dragOffset.current = { x: defaultWidth / 2, y: 15 };
@@ -49,17 +59,24 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     setDragging(true);
     focusWindow(win.id);
     e.preventDefault();
-  }, [win.id, win.x, win.y, isMaximized]);
+  };
 
+  // --- Drag effect (compute/apply split) ---
+  // Solid 2.0 pattern:
+  //   createEffect(
+  //     () => dragging(),                    // COMPUTE: track signal
+  //     (isDragging) => { /* APPLY: side effects */ }
+  //   )
   useEffect(() => {
     if (!dragging) return;
 
+    // APPLY phase: attach listeners, update store
     const onMove = (e: MouseEvent) => {
       const x = e.clientX - dragOffset.current.x;
       const y = e.clientY - dragOffset.current.y;
       useDesktopStore.getState().moveWindow(win.id, Math.max(0, x), Math.max(0, y));
 
-      // Snap zone detection (Cinnamon-style edge snapping)
+      // Snap zone detection — pure function from lib
       const zone = detectSnapZone(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
       setSnapPreview(zone);
     };
@@ -78,6 +95,7 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     document.body.style.cursor = 'grabbing';
     document.body.classList.add('kasm-dragging');
 
+    // CLEANUP (Solid: onCleanup)
     return () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
@@ -86,8 +104,9 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     };
   }, [dragging, win.id]);
 
-  // --- Resize (Re-Flex constraint-aware) ---
-  const onResizeStart = useCallback((dir: ResizeDir, e: React.MouseEvent) => {
+  // --- Resize start ---
+  // No useCallback — plain function.
+  const onResizeStart = (dir: ResizeDir, e: React.MouseEvent) => {
     if (!win.resizable) return;
     setResizing(dir);
     resizeStart.current = {
@@ -98,11 +117,18 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     useDesktopStore.getState().focusWindow(win.id);
     e.preventDefault();
     e.stopPropagation();
-  }, [win.id, win.width, win.height, win.x, win.y, win.resizable]);
+  };
 
+  // --- Resize effect (compute/apply split) ---
+  // Solid 2.0 pattern:
+  //   createEffect(
+  //     () => resizing(),                     // COMPUTE: track signal
+  //     (dir) => { /* APPLY: pointer handlers */ }
+  //   )
   useEffect(() => {
     if (!resizing) return;
 
+    // APPLY phase: attach listeners, compute new geometry via portable fn
     const onMove = (e: MouseEvent) => {
       const dx = e.clientX - resizeStart.current.x;
       const dy = e.clientY - resizeStart.current.y;
@@ -128,6 +154,7 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     document.body.style.cursor = cursor;
     document.body.classList.add('kasm-resizing');
 
+    // CLEANUP
     return () => {
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
@@ -136,22 +163,19 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
     };
   }, [resizing, win.id, win.minWidth, win.minHeight, win.maxWidth, win.maxHeight]);
 
-  // Double-click title to maximize/restore
-  const onTitleDoubleClick = useCallback(() => {
+  // Double-click title to maximize/restore — plain function, no useCallback
+  const onTitleDoubleClick = () => {
     const { maximizeWindow, restoreWindow } = useDesktopStore.getState();
     if (isMaximized) {
       restoreWindow(win.id);
     } else {
       maximizeWindow(win.id);
     }
-  }, [win.id, isMaximized]);
+  };
 
   if (isMinimized) return null;
 
   if (poppedOut) {
-    // When popped out, render nothing in the main window.
-    // The popup is fully independent - no portal, no focus stealing.
-    // We only keep a ref to detect when the popup closes.
     return (
       <PopoutWindow
         open
@@ -210,11 +234,11 @@ export const Window = memo(function Window({ win, children }: WindowProps) {
       </div>
     </>
   );
-});
+}
 
-// Snap preview overlay - uses portable getSnapPreviewStyle from lib
-function SnapPreviewOverlay({ zone }: { zone: SnapZone }) {
-  const style = getSnapPreviewStyle(zone, 48);
+// Snap preview overlay — uses portable getSnapPreviewStyle from lib
+function SnapPreviewOverlay(props: { zone: SnapZone }) {
+  const style = getSnapPreviewStyle(props.zone, 48);
   if (!style) return null;
   return <div className="kasm-snap-preview" style={style as React.CSSProperties} />;
 }

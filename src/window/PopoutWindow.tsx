@@ -4,13 +4,15 @@
 // Uses React portal + stylesheet copying for seamless rendering
 // ============================================================
 
-import { useState, useEffect, useRef, useCallback, memo } from 'react';
+import { useState, useEffect, useRef, memo } from 'react';
 import { createPortal } from 'react-dom';
 import { copyStylesheets } from '../lib/domUtils';
 import './PopoutWindow.css';
 
 // Memo boundary prevents unrelated parent re-renders from
 // reconciling the portal DOM, which would steal popup focus.
+// SOLID 2.0: Not needed — Solid components don't re-render.
+// The Solid port uses render() to mount into the popup, not a portal.
 const PopoutContent = memo(function PopoutContent({ children }: { children: React.ReactNode }) {
   return <div className="kasm-popout-container">{children}</div>;
 });
@@ -94,8 +96,8 @@ export function PopoutWindow({
     return () => { isMountedRef.current = false; };
   }, []);
 
-  // Clean up on unmount or close
-  const cleanup = useCallback((shouldClose = true) => {
+  // Clean up on unmount or close — no useCallback (stable in Solid)
+  const cleanup = (shouldClose = true) => {
     if (closeCheckInterval.current !== null) {
       clearInterval(closeCheckInterval.current);
       closeCheckInterval.current = null;
@@ -105,7 +107,7 @@ export function PopoutWindow({
     }
     popupRef.current = null;
     if (isMountedRef.current) setContainerEl(null);
-  }, []);
+  };
 
   useEffect(() => {
     if (!open) {

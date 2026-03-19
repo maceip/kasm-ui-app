@@ -1,28 +1,34 @@
 // ============================================================
 // Desktop Surface - Main workspace area
 // Renders all windows for the active workspace
+//
+// SOLID 2.0 ALIGNMENT:
+// - No memo() (Solid components don't re-render)
+// - No useCallback() (stable function identity)
+// - .map() → <For each={...}> in Solid, with accessor children
 // ============================================================
 
-import { memo, useCallback } from 'react';
 import { useDesktopStore } from '../core/store';
 import { Window } from '../window/Window';
 import { appRegistry } from '../apps/registry';
 import type { WindowState } from '../core/types';
 import './desktop.css';
 
-const WindowWithApp = memo(function WindowWithApp({ win }: { win: WindowState }) {
-  const app = appRegistry.find(a => a.id === win.appId);
+// No memo() — Solid components run once. Removing makes port mechanical.
+function WindowWithApp(props: { win: WindowState }) {
+  const app = appRegistry.find(a => a.id === props.win.appId);
   if (!app) return null;
   const AppComponent = app.component;
-  const handleTitleChange = useCallback((title: string) => {
-    useDesktopStore.getState().updateWindowTitle(win.id, title);
-  }, [win.id]);
+  // No useCallback — function identity is stable in Solid.
+  const handleTitleChange = (title: string) => {
+    useDesktopStore.getState().updateWindowTitle(props.win.id, title);
+  };
   return (
-    <Window win={win}>
-      <AppComponent windowId={win.id} onTitleChange={handleTitleChange} />
+    <Window win={props.win}>
+      <AppComponent windowId={props.win.id} onTitleChange={handleTitleChange} />
     </Window>
   );
-});
+}
 
 export function Desktop() {
   const windows = useDesktopStore(s => s.windows);
@@ -38,11 +44,10 @@ export function Desktop() {
 
   return (
     <div className={`kasm-desktop ${!sidebarOpen ? 'kasm-desktop--no-sidebar' : ''}`} onMouseDown={closeAppMenu}>
+      {/* Solid 2.0: <For each={visibleWindows}>{(win) => <WindowWithApp win={win()} />}</For> */}
       {visibleWindows.map(win => (
         <WindowWithApp key={win.id} win={win} />
       ))}
-
-      {/* Clean empty desktop - no branding overlay */}
     </div>
   );
 }

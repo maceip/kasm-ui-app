@@ -83,11 +83,44 @@ src/
 │   └── ot.ts              ← Re-export barrel → lib/ot.ts
 │
 ├── components/             ← TIER 2: Shared components
-│   ├── LiquidGlass.tsx    ← Hard: forwardRef, ResizeObserver
+│   ├── LiquidGlass.tsx    ← Medium: forwardRef removed, ResizeObserver effect pre-split
 │   ├── SlidingPane.tsx    ← Medium: animation, mount tracking
 │   ├── liquidGlassUtils.ts ← Keep: pure math (no framework)
 │   └── liquidGlassShaderUtils.ts ← Keep: pure WebGL (no framework)
 ```
+
+---
+
+## Pre-Alignment Already Done (Solid 2.0 Patterns in React)
+
+The React codebase has been restructured so that porting to Solid 2.0 is
+**mechanical** — most changes are find-and-replace, not redesigns.
+
+### What's been pre-aligned:
+
+| Pattern | What We Did | Port Is Now |
+|---------|------------|-------------|
+| **`memo()` removed** | Removed from Window, TitleBar, Desktop/WindowWithApp. Solid components don't re-render. | Delete import |
+| **`useCallback()` removed** | Removed from Window, Desktop, ExpoView, Panel, LiquidGlass, PopoutWindow. Solid functions are stable. | Delete import |
+| **`forwardRef` removed** | LiquidGlass now takes `outerRef` prop instead. Solid passes ref as a regular prop. | Rename `outerRef` → `ref` |
+| **`useId()` removed** | LiquidGlass uses manual counter `glass-${++nextGlassId}`. Works identically in Solid. | Keep as-is |
+| **Effects: compute/apply split** | Window drag/resize, Panel intellihide, LiquidGlass ResizeObserver/shader all split into compute phase (pure) and apply phase (side effect). Comments mark phases. | Map to `createEffect(compute, apply)` |
+| **Props: `props.x` pattern** | Key components (Window, TitleBar, SnapPreviewOverlay, GlassFilter) use `props` object. | Remove local destructuring, use `props.x` |
+| **Draft-style mutations** | `lib/windowActions.ts` exports both `apply*` (immutable, Zustand) and `draft*` (mutating, Solid 2.0 stores). | Use `draft*` variants with `setStore(s => { draftFocusWindow(s.windows, id, z) })` |
+| **Pure logic extracted** | `lib/windowActions.ts`, `lib/domUtils.ts`, `lib/mosaicUtils.ts` — all framework-agnostic. | Import unchanged |
+| **Whole-store subscriptions fixed** | WindowList, WorkspaceSwitcher, NotificationCenter, Settings use granular selectors. | Map to `store.propertyName` |
+
+### Remaining React-isms (need manual port):
+
+| Pattern | Where | Solid 2.0 Equivalent |
+|---------|-------|---------------------|
+| `createPortal` | PopoutWindow.tsx | `render()` into popup container |
+| `Children.toArray` | SplitPane.tsx | `children` is already an array in Solid |
+| `useMemo` | SplitPane.tsx | `createMemo()` |
+| `PopoutContent` memo boundary | PopoutWindow.tsx | Not needed (Solid doesn't re-render) |
+| `useRef` for mutable state | Multiple components | Plain `let` variable |
+| `useEffect` dep arrays | All effect sites | Auto-tracked `createEffect(compute, apply)` |
+| `useState` | All components | `createSignal(value)` |
 
 ---
 
@@ -198,7 +231,7 @@ These components have deep React-specific patterns that need redesign.
 |-----------|--------------|---------------------|
 | **Window.tsx** | `useEffect` chains for drag/resize lifecycle; global listener add/remove on state toggle; `memo` boundary | Two-phase `createEffect`: compute drag state → apply DOM position in apply fn. Logic already extracted to `lib/windowActions.ts`. Remove `memo` entirely. |
 | **SplitPane.tsx** | Recursive constraint solver with 8 `useCallback`s and complex `useEffect` dependency chains | Rewrite as class-based controller; Solid component calls controller methods. `useCallback` removal simplifies massively. |
-| **LiquidGlass.tsx** | `forwardRef`, `useId`, `ResizeObserver` in `useEffect`, SVG filter with dynamic IDs | No `forwardRef` needed (pass `ref` prop directly). Manual ID generation. Two-phase `createEffect` for ResizeObserver: track size → apply filter update. |
+| **LiquidGlass.tsx** | ~~`forwardRef`~~ removed, ~~`useId`~~ removed, ResizeObserver effect | **Already pre-aligned**: uses `outerRef` prop (rename to `ref`), manual ID counter, effects pre-split. Just convert `useState` → `createSignal`. |
 | **SystemMonitor.tsx** | `useRef` for frame counters, `requestAnimationFrame` loop, canvas drawing in `useEffect` | Extract metrics collector as plain class. Two-phase `createEffect`: track metrics → draw canvas. `requestAnimationFrame` loop lives outside reactive system. |
 | **PopoutWindow.tsx** | **`createPortal`** to an external browser window — `Portal` in Solid mounts to same document | Use Solid's `render()` to mount a standalone Solid app into the popup's container div. `copyStylesheets` already extracted to `lib/domUtils.ts`. Manage popup lifecycle with `onCleanup`. |
 

@@ -142,11 +142,34 @@ export function computeResize(
 }
 
 // ---- State Mutations (pure transforms on WindowState[]) ----
+//
+// Two flavors:
+//   apply*  — immutable, returns new array (Zustand / React setState)
+//   draft*  — mutating, modifies items in-place (Solid 2.0 produce-style stores)
+//
+// Both flavors call the same internal helper via `findAndPatch`.
 
-/**
- * Apply a window focus change to an array of windows.
- * Returns a new array (immutable) — suitable for Zustand or Solid reconcile.
- */
+/** Find window by id, apply patch. Immutable version (returns new array). */
+function findAndPatch(
+  windows: WindowState[],
+  id: string,
+  patch: (w: WindowState) => Partial<WindowState>,
+): WindowState[] {
+  return windows.map(w => (w.id === id ? { ...w, ...patch(w) } : w));
+}
+
+/** Find window by id, apply patch. Draft/mutating version (Solid 2.0 stores). */
+function findAndMutate(
+  windows: WindowState[],
+  id: string,
+  mutate: (w: WindowState) => void,
+): void {
+  const w = windows.find(w => w.id === id);
+  if (w) mutate(w);
+}
+
+// ---- Immutable (Zustand / React) ----
+
 export function applyFocusWindow(
   windows: WindowState[],
   id: string,
@@ -166,9 +189,7 @@ export function applyMoveWindow(
   x: number,
   y: number,
 ): WindowState[] {
-  return windows.map(w =>
-    w.id === id ? { ...w, x, y, state: 'normal' as const } : w
-  );
+  return findAndPatch(windows, id, () => ({ x, y, state: 'normal' as const }));
 }
 
 export function applyResizeWindow(
@@ -177,15 +198,10 @@ export function applyResizeWindow(
   width: number,
   height: number,
 ): WindowState[] {
-  return windows.map(w =>
-    w.id === id
-      ? {
-          ...w,
-          width: Math.max(w.minWidth, Math.min(width, w.maxWidth ?? Infinity)),
-          height: Math.max(w.minHeight, Math.min(height, w.maxHeight ?? Infinity)),
-        }
-      : w
-  );
+  return findAndPatch(windows, id, (w) => ({
+    width: Math.max(w.minWidth, Math.min(width, w.maxWidth ?? Infinity)),
+    height: Math.max(w.minHeight, Math.min(height, w.maxHeight ?? Infinity)),
+  }));
 }
 
 export function applySnapWindow(
@@ -199,18 +215,14 @@ export function applySnapWindow(
   const state = zone === 'maximize'
     ? 'maximized' as const
     : `snapped-${zone}` as WindowState['state'];
-  return windows.map(w =>
-    w.id === id ? { ...w, state, ...bounds } : w
-  );
+  return findAndPatch(windows, id, () => ({ state, ...bounds }));
 }
 
 export function applyMinimizeWindow(
   windows: WindowState[],
   id: string,
 ): WindowState[] {
-  return windows.map(w =>
-    w.id === id ? { ...w, state: 'minimized' as const, focused: false } : w
-  );
+  return findAndPatch(windows, id, () => ({ state: 'minimized' as const, focused: false }));
 }
 
 export function applyMaximizeWindow(
@@ -220,18 +232,14 @@ export function applyMaximizeWindow(
   desktopH: number,
 ): WindowState[] {
   const bounds = getSnapBounds('maximize', desktopW, desktopH);
-  return windows.map(w =>
-    w.id === id ? { ...w, state: 'maximized' as const, ...bounds } : w
-  );
+  return findAndPatch(windows, id, () => ({ state: 'maximized' as const, ...bounds }));
 }
 
 export function applyRestoreWindow(
   windows: WindowState[],
   id: string,
 ): WindowState[] {
-  return windows.map(w =>
-    w.id === id ? { ...w, state: 'normal' as const } : w
-  );
+  return findAndPatch(windows, id, () => ({ state: 'normal' as const }));
 }
 
 export function applyUpdateWindowTitle(
@@ -239,7 +247,90 @@ export function applyUpdateWindowTitle(
   id: string,
   title: string,
 ): WindowState[] {
-  return windows.map(w =>
-    w.id === id ? { ...w, title } : w
-  );
+  return findAndPatch(windows, id, () => ({ title }));
+}
+
+// ---- Draft / Mutating (Solid 2.0 produce-style stores) ----
+//
+// Usage with Solid 2.0:
+//   setStore(s => { draftFocusWindow(s.windows, id, nextZ) })
+//
+// These mutate the array items in-place, which is exactly what
+// Solid 2.0's draft-based setStore expects.
+
+export function draftFocusWindow(
+  windows: WindowState[],
+  id: string,
+  nextZIndex: number,
+): void {
+  for (const w of windows) {
+    w.focused = w.id === id;
+    if (w.id === id) {
+      w.zIndex = nextZIndex;
+      if (w.state === 'minimized') w.state = 'normal';
+    }
+  }
+}
+
+export function draftMoveWindow(
+  windows: WindowState[],
+  id: string,
+  x: number,
+  y: number,
+): void {
+  findAndMutate(windows, id, w => { w.x = x; w.y = y; w.state = 'normal'; });
+}
+
+export function draftResizeWindow(
+  windows: WindowState[],
+  id: string,
+  width: number,
+  height: number,
+): void {
+  findAndMutate(windows, id, w => {
+    w.width = Math.max(w.minWidth, Math.min(width, w.maxWidth ?? Infinity));
+    w.height = Math.max(w.minHeight, Math.min(height, w.maxHeight ?? Infinity));
+  });
+}
+
+export function draftSnapWindow(
+  windows: WindowState[],
+  id: string,
+  zone: SnapZone,
+  desktopW: number,
+  desktopH: number,
+): void {
+  const bounds = getSnapBounds(zone, desktopW, desktopH);
+  const state = zone === 'maximize'
+    ? 'maximized' as const
+    : `snapped-${zone}` as WindowState['state'];
+  findAndMutate(windows, id, w => {
+    w.state = state; w.x = bounds.x; w.y = bounds.y;
+    w.width = bounds.width; w.height = bounds.height;
+  });
+}
+
+export function draftMinimizeWindow(windows: WindowState[], id: string): void {
+  findAndMutate(windows, id, w => { w.state = 'minimized'; w.focused = false; });
+}
+
+export function draftMaximizeWindow(
+  windows: WindowState[],
+  id: string,
+  desktopW: number,
+  desktopH: number,
+): void {
+  const bounds = getSnapBounds('maximize', desktopW, desktopH);
+  findAndMutate(windows, id, w => {
+    w.state = 'maximized'; w.x = bounds.x; w.y = bounds.y;
+    w.width = bounds.width; w.height = bounds.height;
+  });
+}
+
+export function draftRestoreWindow(windows: WindowState[], id: string): void {
+  findAndMutate(windows, id, w => { w.state = 'normal'; });
+}
+
+export function draftUpdateWindowTitle(windows: WindowState[], id: string, title: string): void {
+  findAndMutate(windows, id, w => { w.title = title; });
 }

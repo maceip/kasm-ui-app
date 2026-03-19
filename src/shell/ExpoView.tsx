@@ -4,7 +4,7 @@
 // Scale: shows all windows in current workspace spread in a grid
 // ============================================================
 
-import { useEffect, useCallback } from 'react';
+import { useEffect } from 'react';
 import { useDesktopStore } from '../core/store';
 import './expoView.css';
 
@@ -18,9 +18,11 @@ export function ExpoView() {
   const focusWindow = useDesktopStore(s => s.focusWindow);
   const addWorkspace = useDesktopStore(s => s.addWorkspace);
 
-  const close = useCallback(() => setExpoMode('off'), [setExpoMode]);
+  // No useCallback — stable identity in Solid.
+  const close = () => setExpoMode('off');
 
-  // Close on Escape
+  // Escape key effect (compute/apply split)
+  // Solid 2.0: createEffect(() => expoMode(), (mode) => { if (mode !== 'off') addListener... })
   useEffect(() => {
     if (expoMode === 'off') return;
     const handler = (e: KeyboardEvent) => {
@@ -31,7 +33,7 @@ export function ExpoView() {
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  }, [expoMode, close]);
+  }, [expoMode]);
 
   if (expoMode === 'off') return null;
 
