@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kasm UI – Docs &amp; Demo</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --surface: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --accent2: #3fb950;
+      --warn: #d29922;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .header {
+      border-bottom: 1px solid var(--border);
+      padding: 1.5rem 2rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .header h1 { font-size: 1.5rem; font-weight: 600; }
+    .header .badge {
+      background: var(--accent2);
+      color: #000;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15rem 0.5rem;
+      border-radius: 999px;
+    }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 2rem; }
+
+    .demo-section {
+      margin: 2rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .demo-section h2 {
+      padding: 1rem 1.5rem;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      font-size: 1.1rem;
+    }
+    .demo-frame {
+      width: 100%;
+      height: 600px;
+      border: none;
+      background: #000;
+    }
+
+    .section {
+      margin: 2.5rem 0;
+    }
+    .section h2 {
+      font-size: 1.3rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .benchmark-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    .benchmark-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .benchmark-card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+    .benchmark-card p { color: var(--muted); font-size: 0.9rem; }
+    .benchmark-card .metric {
+      margin-top: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+    .benchmark-card .metric code {
+      background: rgba(88,166,255,0.1);
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      font-size: 0.8rem;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+      font-size: 0.9rem;
+    }
+    th, td {
+      padding: 0.6rem 1rem;
+      border: 1px solid var(--border);
+      text-align: left;
+    }
+    th {
+      background: var(--surface);
+      font-weight: 600;
+    }
+    td { color: var(--muted); }
+    td.win { color: var(--accent2); font-weight: 600; }
+
+    .instructions {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-top: 1rem;
+    }
+    .instructions pre {
+      background: var(--bg);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      margin: 0.5rem 0;
+      font-size: 0.85rem;
+      line-height: 1.5;
+    }
+    .instructions ol { padding-left: 1.25rem; }
+    .instructions li { margin: 0.5rem 0; color: var(--muted); }
+
+    footer {
+      margin-top: 3rem;
+      padding: 1.5rem 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Kasm UI</h1>
+  <span class="badge">SolidJS</span>
+</div>
+
+<div class="container">
+
+  <!-- Live Demo -->
+  <div class="demo-section">
+    <h2>Live Demo</h2>
+    <iframe
+      class="demo-frame"
+      src="../index.html"
+      title="Kasm UI Live Demo"
+      loading="lazy"
+      sandbox="allow-scripts allow-same-origin allow-popups"
+    ></iframe>
+  </div>
+  <p style="margin-top:0.5rem; color:var(--muted); font-size:0.85rem;">
+    Or <a href="../index.html" target="_blank">open full-screen in a new tab</a>.
+  </p>
+
+  <!-- Interaction Benchmarks -->
+  <div class="section">
+    <h2>Interaction Benchmarks: React vs SolidJS</h2>
+    <p style="color:var(--muted); margin-bottom:1rem;">
+      The following benchmarks measure real-world interaction performance — the metrics users actually feel.
+      Use these to quantify the delta after migrating from React to SolidJS.
+    </p>
+
+    <div class="benchmark-grid">
+
+      <div class="benchmark-card">
+        <h3>INP (Interaction to Next Paint)</h3>
+        <p>
+          Core Web Vital that measures the latency of all user interactions (clicks, taps, keypresses)
+          throughout the page lifecycle. Reports the worst-case interaction (p98).
+        </p>
+        <div class="metric">
+          Target: <code>&lt; 200ms</code> (good) &middot; <code>&gt; 500ms</code> (poor)<br/>
+          Measure: Chrome DevTools → Performance panel, or <code>web-vitals</code> library
+        </div>
+      </div>
+
+      <div class="benchmark-card">
+        <h3>TBT (Total Blocking Time)</h3>
+        <p>
+          Sum of all long tasks (&gt;50ms) between FCP and TTI. Directly correlates with how
+          "janky" the UI feels during load. SolidJS's lack of VDOM diffing dramatically reduces TBT.
+        </p>
+        <div class="metric">
+          Target: <code>&lt; 200ms</code> (good) &middot; <code>&gt; 600ms</code> (poor)<br/>
+          Measure: Lighthouse, WebPageTest, or <code>PerformanceObserver</code> for long tasks
+        </div>
+      </div>
+
+      <div class="benchmark-card">
+        <h3>js-framework-benchmark</h3>
+        <p>
+          The gold-standard benchmark suite for comparing JS frameworks. Tests operations like
+          create/update/swap/delete 1,000–10,000 rows in a keyed list.
+        </p>
+        <div class="metric">
+          SolidJS is consistently <code>~1.0x–1.06x</code> vanilla JS speed<br/>
+          React is typically <code>~1.4x–1.8x</code> vanilla JS speed<br/>
+          Source: <a href="https://krausest.github.io/js-framework-benchmark/current.html" target="_blank">krausest/js-framework-benchmark</a>
+        </div>
+      </div>
+
+      <div class="benchmark-card">
+        <h3>Bundle Size</h3>
+        <p>
+          Smaller bundles mean faster parse/compile times which directly impact interaction readiness.
+          SolidJS compiles away its reactivity — no runtime VDOM overhead.
+        </p>
+        <div class="metric">
+          solid-js: <code>~7 KB</code> gzipped<br/>
+          react + react-dom: <code>~42 KB</code> gzipped
+        </div>
+      </div>
+
+      <div class="benchmark-card">
+        <h3>Startup / Hydration Time</h3>
+        <p>
+          Time from script evaluation to interactive UI. SolidJS skips reconciliation —
+          components run once, then only signals update the DOM surgically.
+        </p>
+        <div class="metric">
+          Measure: <code>performance.mark()</code> at app entry vs first interaction handler ready
+        </div>
+      </div>
+
+      <div class="benchmark-card">
+        <h3>Memory (Heap Snapshots)</h3>
+        <p>
+          SolidJS creates fewer JS objects (no virtual DOM tree, no fiber nodes).
+          Lower memory pressure means fewer GC pauses and smoother interactions.
+        </p>
+        <div class="metric">
+          Measure: Chrome DevTools → Memory → Heap Snapshot, compare at idle after load
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Expected Improvements -->
+  <div class="section">
+    <h2>Expected Performance Delta</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th>React (typical)</th>
+          <th>SolidJS (typical)</th>
+          <th>Expected Improvement</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Bundle size (gzip)</td>
+          <td>~42 KB (react+dom)</td>
+          <td class="win">~7 KB</td>
+          <td class="win">~83% smaller</td>
+        </tr>
+        <tr>
+          <td>INP (p75)</td>
+          <td>150–300ms</td>
+          <td class="win">40–100ms</td>
+          <td class="win">2–3x faster</td>
+        </tr>
+        <tr>
+          <td>TBT</td>
+          <td>200–500ms</td>
+          <td class="win">20–80ms</td>
+          <td class="win">5–10x lower</td>
+        </tr>
+        <tr>
+          <td>List ops (1k rows)</td>
+          <td>~1.5x vanilla</td>
+          <td class="win">~1.03x vanilla</td>
+          <td class="win">Near-native speed</td>
+        </tr>
+        <tr>
+          <td>Memory at idle</td>
+          <td>Baseline</td>
+          <td class="win">30–50% lower</td>
+          <td class="win">Fewer GC pauses</td>
+        </tr>
+        <tr>
+          <td>Component mount</td>
+          <td>Re-renders full tree</td>
+          <td class="win">Runs once, signals update DOM</td>
+          <td class="win">No re-render overhead</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- How to Measure -->
+  <div class="section">
+    <h2>How to Measure Yourself</h2>
+
+    <div class="instructions">
+      <ol>
+        <li>
+          <strong>web-vitals library</strong> — Drop-in measurement for INP, FCP, LCP, CLS, TTFB:
+          <pre><code>import { onINP, onTBT } from 'web-vitals';
+onINP(console.log);  // logs every interaction latency</code></pre>
+        </li>
+        <li>
+          <strong>Chrome DevTools Performance Panel</strong> — Record a session, check "Interactions" lane
+          for INP-qualifying events and their processing duration.
+        </li>
+        <li>
+          <strong>Lighthouse User Flows</strong> — Script a user flow (open window, drag, type in terminal)
+          and measure TBT + INP across the entire interaction sequence:
+          <pre><code>import { startFlow } from 'lighthouse';
+const flow = await startFlow(page, { name: 'Desktop Interaction' });
+await flow.startTimespan({ stepName: 'Open Terminal' });
+await page.click('[data-app="terminal"]');
+await flow.endTimespan();
+console.log(await flow.generateReport());</code></pre>
+        </li>
+        <li>
+          <strong>js-framework-benchmark</strong> — Clone the repo and add Kasm's list component
+          to get standardized row-operation timings:
+          <pre><code>git clone https://github.com/krausest/js-framework-benchmark
+# Add kasm-solid/ and kasm-react/ framework entries
+npm run build &amp;&amp; npm run bench</code></pre>
+        </li>
+        <li>
+          <strong>Custom marks</strong> — Instrument specific interactions:
+          <pre><code>performance.mark('window-drag-start');
+// ... drag handler runs ...
+performance.mark('window-drag-paint');
+performance.measure('drag-latency', 'window-drag-start', 'window-drag-paint');</code></pre>
+        </li>
+      </ol>
+    </div>
+  </div>
+
+  <footer>
+    Kasm UI &middot; SolidJS Desktop Environment &middot;
+    <a href="https://github.com/maceip/kasm-ui-app">GitHub</a>
+  </footer>
+
+</div>
+
+</body>
+</html>
