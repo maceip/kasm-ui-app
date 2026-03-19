@@ -2,34 +2,34 @@
 // System Tray - Cinnamon-style status icons
 // ============================================================
 
-import { useState } from 'react';
+import { createSignal } from 'solid-js';
 import './systemTray.css';
 
 export function SystemTray() {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = createSignal(false);
 
   return (
-    <div className="kasm-system-tray">
+    <div class="kasm-system-tray">
       <button
-        className="kasm-system-tray__expand"
-        onClick={() => setExpanded(!expanded)}
-        title={expanded ? 'Collapse' : 'Show hidden icons'}
+        class="kasm-system-tray__expand"
+        onClick={() => setExpanded(!expanded())}
+        title={expanded() ? 'Collapse' : 'Show hidden icons'}
       >
-        {expanded ? '◂' : '▸'}
+        {expanded() ? '\u25C2' : '\u25B8'}
       </button>
-      <div className={`kasm-system-tray__icons ${expanded ? 'kasm-system-tray__icons--expanded' : ''}`}>
-        <TrayIcon icon="🔊" title="Volume: 100%" />
-        <TrayIcon icon="📶" title="Connected" />
-        <TrayIcon icon="🔋" title="Battery: 100%" />
+      <div class={`kasm-system-tray__icons ${expanded() ? 'kasm-system-tray__icons--expanded' : ''}`}>
+        <TrayIcon icon="\u{1F50A}" title="Volume: 100%" />
+        <TrayIcon icon="\u{1F4F6}" title="Connected" />
+        <TrayIcon icon="\u{1F50B}" title="Battery: 100%" />
       </div>
     </div>
   );
 }
 
-function TrayIcon({ icon, title }: { icon: string; title: string }) {
+function TrayIcon(props: { icon: string; title: string }) {
   return (
-    <button className="kasm-system-tray__icon" title={title}>
-      {icon}
+    <button class="kasm-system-tray__icon" title={props.title}>
+      {props.icon}
     </button>
   );
 }

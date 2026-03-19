@@ -3,7 +3,7 @@
 // Uses OT engine for conflict resolution with textarea binding
 // ============================================================
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { createEffect, createMemo } from 'solid-js';
 import { useCollabDoc } from '../collab/CollabProvider';
 import { useTheme } from '../theme/ThemeProvider';
 import type { AppProps } from '../core/types';
@@ -49,7 +49,7 @@ function computeTextDiff(
   return { pos: prefixLen, deleteCount, insert };
 }
 
-export function CollabEditor({ windowId }: AppProps) {
+export function CollabEditor(props: AppProps) {
   const theme = useTheme();
 
   const { snapshot, submitOp, doc, connectionState, clientId } = useCollabDoc<DocState>(
@@ -58,16 +58,16 @@ export function CollabEditor({ windowId }: AppProps) {
   );
 
   // Track previous value for ShareJS diff pattern
-  const prevContentRef = useRef(snapshot.content);
+  let prevContent = snapshot.content;
 
   // Keep prev ref in sync when snapshot changes from remote ops
-  useEffect(() => {
-    prevContentRef.current = snapshot.content;
-  }, [snapshot.content]);
+  createEffect(() => {
+    prevContent = snapshot.content;
+  });
 
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const newContent = e.target.value;
-    const oldContent = prevContentRef.current;
+  const handleChange = (e: InputEvent & { currentTarget: HTMLTextAreaElement }) => {
+    const newContent = e.currentTarget.value;
+    const oldContent = prevContent;
 
     const diff = computeTextDiff(oldContent, newContent);
     if (!diff) return;
@@ -83,35 +83,36 @@ export function CollabEditor({ windowId }: AppProps) {
       submitOp({ p: ['content', diff.pos], si: diff.insert });
     }
 
-    prevContentRef.current = newContent;
-  }, [submitOp]);
+    prevContent = newContent;
+  };
 
   // Connection status display
-  const statusConfig = connectionState === 'connected'
-    ? { label: 'Connected', color: theme.colors.success }
-    : connectionState === 'connecting'
-      ? { label: 'Reconnecting...', color: theme.colors.warning }
-      : { label: 'Local only', color: theme.colors.warning };
-
-  const version = doc.getVersion();
+  const statusConfig = createMemo(() => {
+    const connState = connectionState();
+    return connState === 'connected'
+      ? { label: 'Connected', color: theme.colors.success }
+      : connState === 'connecting'
+        ? { label: 'Reconnecting...', color: theme.colors.warning }
+        : { label: 'Local only', color: theme.colors.warning };
+  });
 
   return (
-    <div className="kasm-app kasm-collab-editor">
-      <div className="kasm-collab-editor__toolbar">
-        <span className="kasm-collab-editor__status" style={{ color: statusConfig.color }}>
-          ● {statusConfig.label}
+    <div class="kasm-app kasm-collab-editor">
+      <div class="kasm-collab-editor__toolbar">
+        <span class="kasm-collab-editor__status" style={{ color: statusConfig().color }}>
+          ● {statusConfig().label}
         </span>
-        <span className="kasm-collab-editor__version">v{version}</span>
-        <span className="kasm-collab-editor__client">Client: {clientId.slice(0, 8)}</span>
+        <span class="kasm-collab-editor__version">v{doc.getVersion()}</span>
+        <span class="kasm-collab-editor__client">Client: {clientId.slice(0, 8)}</span>
       </div>
       <textarea
-        className="kasm-collab-editor__textarea"
+        class="kasm-collab-editor__textarea"
         value={snapshot.content}
-        onChange={handleChange}
-        spellCheck={false}
+        onInput={handleChange}
+        spellcheck={false}
         placeholder="Start typing..."
       />
-      <div className="kasm-collab-editor__footer">
+      <div class="kasm-collab-editor__footer">
         <span>ShareJS OT Engine</span>
         <span>{snapshot.content.length} chars</span>
       </div>

@@ -3,7 +3,7 @@
 // Recursive split/tab tree model with full restructuring
 // ============================================================
 
-import { useState, useCallback, useMemo } from 'react';
+import { createSignal, type JSX } from 'solid-js';
 import { SplitPane } from '../layout/SplitPane';
 import { TabPanel, type Tab } from '../layout/TabPanel';
 import { clampSplitPercentages } from '../layout/mosaicUtils';
@@ -304,22 +304,21 @@ interface TreeRendererProps {
   onTabReorder: (panelId: string, fromIdx: number, toIdx: number) => void;
 }
 
-function RenderNode({ node, onDock, onTabClose, onTabChange, onTabReorder }: TreeRendererProps) {
-  if (node.type === 'split') {
+function RenderNode(props: TreeRendererProps) {
+  if (props.node.type === 'split') {
     return (
       <SplitPane
-        orientation={node.direction}
-        sizes={node.sizes}
-        minSizes={node.children.map(() => 80)}
+        orientation={props.node.direction}
+        sizes={props.node.sizes}
+        minSizes={props.node.children.map(() => 80)}
       >
-        {node.children.map((child, i) => (
+        {props.node.children.map((child, i) => (
           <RenderNode
-            key={child.type === 'tabs' ? child.id : `split-${i}`}
             node={child}
-            onDock={onDock}
-            onTabClose={onTabClose}
-            onTabChange={onTabChange}
-            onTabReorder={onTabReorder}
+            onDock={props.onDock}
+            onTabClose={props.onTabClose}
+            onTabChange={props.onTabChange}
+            onTabReorder={props.onTabReorder}
           />
         ))}
       </SplitPane>
@@ -329,15 +328,15 @@ function RenderNode({ node, onDock, onTabClose, onTabChange, onTabReorder }: Tre
   // Tabs node
   return (
     <TabPanel
-      tabs={node.tabs}
-      activeTabId={node.activeTabId}
-      panelId={node.id}
+      tabs={props.node.tabs}
+      activeTabId={props.node.activeTabId}
+      panelId={props.node.id}
       onDock={(tabId, direction, _targetPanelId) => {
-        onDock(tabId, direction, node.id);
+        props.onDock(tabId, direction, props.node.id);
       }}
-      onTabChange={(tabId) => onTabChange(node.id, tabId)}
-      onTabClose={onTabClose}
-      onTabReorder={(fromIdx, toIdx) => onTabReorder(node.id, fromIdx, toIdx)}
+      onTabChange={(tabId) => props.onTabChange((props.node as TabsNode).id, tabId)}
+      onTabClose={props.onTabClose}
+      onTabReorder={(fromIdx, toIdx) => props.onTabReorder((props.node as TabsNode).id, fromIdx, toIdx)}
     />
   );
 }
@@ -346,10 +345,10 @@ function RenderNode({ node, onDock, onTabClose, onTabChange, onTabReorder }: Tre
 // DockingDemo component
 // ============================================================
 
-export function DockingDemo({ windowId }: AppProps) {
-  const [layout, setLayout] = useState<LayoutNode>(createDefaultLayout);
+export function DockingDemo(props: AppProps) {
+  const [layout, setLayout] = createSignal<LayoutNode>(createDefaultLayout());
 
-  const handleDock = useCallback((tabId: string, direction: DockDirection, targetPanelId: string) => {
+  const handleDock = (tabId: string, direction: DockDirection, targetPanelId: string) => {
     setLayout(prev => {
       // Don't dock a tab onto the same panel as 'center' if it's already there
       if (direction === 'center') {
@@ -362,25 +361,25 @@ export function DockingDemo({ windowId }: AppProps) {
       const newTree = dockTab(prev, tabId, targetPanelId, direction);
       return fixTree(newTree) ?? createDefaultLayout();
     });
-  }, []);
+  };
 
-  const handleTabClose = useCallback((tabId: string) => {
+  const handleTabClose = (tabId: string) => {
     setLayout(prev => {
       const newTree = removeTab(prev, tabId);
       return fixTree(newTree ?? createDefaultLayout()) ?? createDefaultLayout();
     });
-  }, []);
+  };
 
-  const handleTabChange = useCallback((panelId: string, tabId: string) => {
+  const handleTabChange = (panelId: string, tabId: string) => {
     setLayout(prev => {
       return updatePanelInTree(prev, panelId, panel => ({
         ...panel,
         activeTabId: tabId,
       }));
     });
-  }, []);
+  };
 
-  const handleTabReorder = useCallback((panelId: string, fromIdx: number, toIdx: number) => {
+  const handleTabReorder = (panelId: string, fromIdx: number, toIdx: number) => {
     setLayout(prev => {
       return updatePanelInTree(prev, panelId, panel => {
         const newTabs = [...panel.tabs];
@@ -389,12 +388,12 @@ export function DockingDemo({ windowId }: AppProps) {
         return { ...panel, tabs: newTabs };
       });
     });
-  }, []);
+  };
 
   return (
-    <div className="kasm-app kasm-docking-demo">
+    <div class="kasm-app kasm-docking-demo">
       <RenderNode
-        node={layout}
+        node={layout()}
         onDock={handleDock}
         onTabClose={handleTabClose}
         onTabChange={handleTabChange}
@@ -422,26 +421,26 @@ function updatePanelInTree(
 }
 
 // ============================================================
-// Panel content components (unchanged)
+// Panel content components
 // ============================================================
 
 function ExplorerPanel() {
   return (
-    <div className="kasm-dock-panel-content">
-      <div className="kasm-dock-tree">
-        <div className="kasm-dock-tree__item">{'\u{1F4C1}'} src</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C1}'} core</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 40 }}>{'\u{1F4C4}'} types.ts</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 40 }}>{'\u{1F4C4}'} store.ts</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 40 }}>{'\u{1F4C4}'} events.ts</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C1}'} shell</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C1}'} window</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C1}'} layout</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C1}'} apps</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C4}'} App.tsx</div>
-        <div className="kasm-dock-tree__item" style={{ paddingLeft: 20 }}>{'\u{1F4C4}'} main.tsx</div>
-        <div className="kasm-dock-tree__item">{'\u{1F4C4}'} package.json</div>
-        <div className="kasm-dock-tree__item">{'\u{1F4C4}'} tsconfig.json</div>
+    <div class="kasm-dock-panel-content">
+      <div class="kasm-dock-tree">
+        <div class="kasm-dock-tree__item">{'\u{1F4C1}'} src</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C1}'} core</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '40px' }}>{'\u{1F4C4}'} types.ts</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '40px' }}>{'\u{1F4C4}'} store.ts</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '40px' }}>{'\u{1F4C4}'} events.ts</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C1}'} shell</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C1}'} window</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C1}'} layout</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C1}'} apps</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C4}'} App.tsx</div>
+        <div class="kasm-dock-tree__item" style={{ "padding-left": '20px' }}>{'\u{1F4C4}'} main.tsx</div>
+        <div class="kasm-dock-tree__item">{'\u{1F4C4}'} package.json</div>
+        <div class="kasm-dock-tree__item">{'\u{1F4C4}'} tsconfig.json</div>
       </div>
     </div>
   );
@@ -449,17 +448,17 @@ function ExplorerPanel() {
 
 function SearchPanel() {
   return (
-    <div className="kasm-dock-panel-content">
-      <input type="text" placeholder="Search files..." style={{ width: '100%', padding: 6, boxSizing: 'border-box' }} />
+    <div class="kasm-dock-panel-content">
+      <input type="text" placeholder="Search files..." style={{ width: '100%', padding: '6px', "box-sizing": 'border-box' }} />
     </div>
   );
 }
 
 function WelcomePanel() {
   return (
-    <div className="kasm-dock-panel-content" style={{ padding: 20 }}>
+    <div class="kasm-dock-panel-content" style={{ padding: '20px' }}>
       <h3>Docking Layout Demo</h3>
-      <p style={{ fontSize: 13, lineHeight: 1.8 }}>
+      <p style={{ "font-size": '13px', "line-height": '1.8' }}>
         This demonstrates the docking system combining:<br />
         <strong>rc-dock</strong> - tabbed panels with drag-to-dock restructuring<br />
         <strong>Re-Flex</strong> - constraint-aware resizable splitters<br />
@@ -472,8 +471,8 @@ function WelcomePanel() {
 
 function CodePanel() {
   return (
-    <div className="kasm-dock-panel-content">
-      <pre style={{ margin: 0, padding: 12, fontSize: 12, lineHeight: 1.6 }}>{`import { createRoot } from 'react-dom/client';
+    <div class="kasm-dock-panel-content">
+      <pre style={{ margin: '0', padding: '12px', "font-size": '12px', "line-height": '1.6' }}>{`import { createRoot } from 'react-dom/client';
 import { App } from './App';
 
 const root = createRoot(
@@ -487,7 +486,7 @@ root.render(<App />);`}</pre>
 
 function MiniTerminal() {
   return (
-    <div className="kasm-dock-panel-content" style={{ background: 'var(--kasm-terminal-bg)', color: 'var(--kasm-terminal-fg)', fontFamily: 'monospace', fontSize: 12, padding: 8 }}>
+    <div class="kasm-dock-panel-content" style={{ background: 'var(--kasm-terminal-bg)', color: 'var(--kasm-terminal-fg)', "font-family": 'monospace', "font-size": '12px', padding: '8px' }}>
       $ npm run dev<br />
       VITE v7.2.5 ready in 120ms<br />
       {'\u279E'} Local: http://localhost:5173/<br />
@@ -497,7 +496,7 @@ function MiniTerminal() {
 
 function OutputPanel() {
   return (
-    <div className="kasm-dock-panel-content" style={{ fontSize: 12, padding: 8 }}>
+    <div class="kasm-dock-panel-content" style={{ "font-size": '12px', padding: '8px' }}>
       [INFO] Build completed in 0.42s<br />
       [INFO] 0 errors, 0 warnings<br />
     </div>
@@ -506,7 +505,7 @@ function OutputPanel() {
 
 function ProblemsPanel() {
   return (
-    <div className="kasm-dock-panel-content" style={{ fontSize: 12, padding: 8 }}>
+    <div class="kasm-dock-panel-content" style={{ "font-size": '12px', padding: '8px' }}>
       No problems detected. {'\u2713'}
     </div>
   );

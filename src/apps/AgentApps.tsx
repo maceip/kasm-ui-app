@@ -2,7 +2,7 @@
 // AI Agent Terminal Apps - Coding agent launcher interfaces
 // ============================================================
 
-import { useState, useRef, useEffect } from 'react';
+import { createSignal, createEffect, onCleanup, For, Show, type JSX } from 'solid-js';
 import type { AppProps } from '../core/types';
 import { useTheme } from '../theme/ThemeProvider';
 import './apps.css';
@@ -17,42 +17,44 @@ interface AgentConfig {
   name: string;
   description: string;
   color: string;
-  logo: React.ReactNode;
+  logo: JSX.Element;
 }
 
-function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
+function AgentTerminal(props: AppProps & { agent: AgentConfig }) {
   const theme = useTheme();
   const tc = theme.colors;
-  const [lines, setLines] = useState<AgentLine[]>([
+  const [lines, setLines] = createSignal<AgentLine[]>([
     { text: `\u250C${'─'.repeat(50)}\u2510`, type: 'system' },
-    { text: `│  ${agent.name}`, type: 'system' },
-    { text: `│  ${agent.description}`, type: 'system' },
+    { text: `│  ${props.agent.name}`, type: 'system' },
+    { text: `│  ${props.agent.description}`, type: 'system' },
     { text: `\u2514${'─'.repeat(50)}\u2518`, type: 'system' },
     { text: '', type: 'output' },
     { text: 'Type a command or question to interact with the agent.', type: 'output' },
     { text: 'Type "help" for available commands.', type: 'output' },
   ]);
-  const [input, setInput] = useState('');
-  const [history, setHistory] = useState<string[]>([]);
-  const [historyIdx, setHistoryIdx] = useState(-1);
-  const [thinking, setThinking] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [input, setInput] = createSignal('');
+  const [history, setHistory] = createSignal<string[]>([]);
+  const [historyIdx, setHistoryIdx] = createSignal(-1);
+  const [thinking, setThinking] = createSignal(false);
+  let bottomRef!: HTMLDivElement;
+  let inputRef!: HTMLInputElement;
 
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [lines]);
+  createEffect(() => {
+    // Track lines to auto-scroll
+    lines();
+    bottomRef?.scrollIntoView({ behavior: 'smooth' });
+  });
 
   const execute = (cmd: string) => {
     const trimmed = cmd.trim();
-    if (!trimmed || thinking) return;
+    if (!trimmed || thinking()) return;
 
     setHistory(prev => [trimmed, ...prev]);
     setHistoryIdx(-1);
 
     const newLines: AgentLine[] = [
-      ...lines,
-      { text: `<span style="color:${agent.color};font-weight:bold">${agent.name.toLowerCase().replace(/\s+/g, '-')}</span> <span style="color:${tc.textMuted}">$</span> ${trimmed}`, type: 'input', html: true },
+      ...lines(),
+      { text: `<span style="color:${props.agent.color};font-weight:bold">${props.agent.name.toLowerCase().replace(/\s+/g, '-')}</span> <span style="color:${tc.textMuted}">$</span> ${trimmed}`, type: 'input', html: true },
     ];
 
     if (trimmed === 'clear') {
@@ -76,7 +78,7 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
     }
 
     if (trimmed === 'version') {
-      newLines.push({ text: `${agent.name} v1.0.0 (preview)`, type: 'output' });
+      newLines.push({ text: `${props.agent.name} v1.0.0 (preview)`, type: 'output' });
       setLines(newLines);
       setInput('');
       return;
@@ -84,7 +86,7 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
 
     if (trimmed === 'status') {
       newLines.push(
-        { text: `Agent: ${agent.name}`, type: 'output' },
+        { text: `Agent: ${props.agent.name}`, type: 'output' },
         { text: 'Status: Preview mode (no API connected)', type: 'output' },
         { text: 'To enable: connect to the real agent API endpoint', type: 'output' },
       );
@@ -94,7 +96,7 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
     }
 
     newLines.push({
-      text: `<span style="color:${tc.warning}">⟳ ${agent.name} is thinking...</span>`,
+      text: `<span style="color:${tc.warning}">\u27F3 ${props.agent.name} is thinking...</span>`,
       type: 'system',
       html: true,
     });
@@ -106,7 +108,7 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
       setLines(prev => [
         ...prev.slice(0, -1),
         {
-          text: `<span style="color:${agent.color};font-weight:bold">[${agent.name}]</span> Received: "${trimmed}"\n\nThis is a preview environment. Connect to the real ${agent.name} API to enable full agent capabilities.`,
+          text: `<span style="color:${props.agent.color};font-weight:bold">[${props.agent.name}]</span> Received: "${trimmed}"\n\nThis is a preview environment. Connect to the real ${props.agent.name} API to enable full agent capabilities.`,
           type: 'output',
           html: true,
         },
@@ -115,22 +117,22 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
     }, 1000);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === 'Enter') {
-      execute(input);
+      execute(input());
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      if (historyIdx < history.length - 1) {
-        const idx = historyIdx + 1;
+      if (historyIdx() < history().length - 1) {
+        const idx = historyIdx() + 1;
         setHistoryIdx(idx);
-        setInput(history[idx]);
+        setInput(history()[idx]);
       }
     } else if (e.key === 'ArrowDown') {
       e.preventDefault();
-      if (historyIdx > 0) {
-        const idx = historyIdx - 1;
+      if (historyIdx() > 0) {
+        const idx = historyIdx() - 1;
         setHistoryIdx(idx);
-        setInput(history[idx]);
+        setInput(history()[idx]);
       } else {
         setHistoryIdx(-1);
         setInput('');
@@ -142,43 +144,44 @@ function AgentTerminal({ windowId, agent }: AppProps & { agent: AgentConfig }) {
   };
 
   return (
-    <div className="kasm-app kasm-terminal" onClick={() => inputRef.current?.focus()}>
+    <div class="kasm-app kasm-terminal" onClick={() => inputRef?.focus()}>
       <div style={{
         display: 'flex',
-        alignItems: 'center',
-        gap: 10,
+        "align-items": 'center',
+        gap: '10px',
         padding: '6px 12px',
         background: tc.surfaceBg,
-        borderBottom: `1px solid ${tc.surfaceBorder}`,
-        fontSize: 13,
+        "border-bottom": `1px solid ${tc.surfaceBorder}`,
+        "font-size": '13px',
       }}>
-        <span style={{ display: 'flex', alignItems: 'center' }}>{agent.logo}</span>
-        <span style={{ fontWeight: 700, color: agent.color }}>{agent.name}</span>
-        <span style={{ color: tc.textMuted, marginLeft: 'auto', fontSize: 11 }}>Agent Terminal</span>
+        <span style={{ display: 'flex', "align-items": 'center' }}>{props.agent.logo}</span>
+        <span style={{ "font-weight": 700, color: props.agent.color }}>{props.agent.name}</span>
+        <span style={{ color: tc.textMuted, "margin-left": 'auto', "font-size": '11px' }}>Agent Terminal</span>
       </div>
-      <div className="kasm-terminal__output" style={{ flex: 1, overflow: 'auto' }}>
-        {lines.map((line, i) => (
-          <div
-            key={i}
-            className={`kasm-terminal__line kasm-terminal__line--${line.type === 'system' ? 'output' : line.type}`}
-            style={line.type === 'system' ? { color: tc.textMuted } : undefined}
-            {...(line.html ? { dangerouslySetInnerHTML: { __html: line.text } } : { children: line.text })}
-          />
-        ))}
-        <div ref={bottomRef} />
+      <div class="kasm-terminal__output" style={{ flex: 1, overflow: 'auto' }}>
+        <For each={lines()}>
+          {(line) => (
+            <div
+              class={`kasm-terminal__line kasm-terminal__line--${line.type === 'system' ? 'output' : line.type}`}
+              style={line.type === 'system' ? { color: tc.textMuted } : undefined}
+              {...(line.html ? { innerHTML: line.text } : { children: line.text })}
+            />
+          )}
+        </For>
+        <div ref={bottomRef!} />
       </div>
-      <div className="kasm-terminal__prompt">
-        <span style={{ color: agent.color, fontWeight: 700, marginRight: 4 }}>{'>'}</span>
+      <div class="kasm-terminal__prompt">
+        <span style={{ color: props.agent.color, "font-weight": 700, "margin-right": '4px' }}>{'>'}</span>
         <input
-          ref={inputRef}
-          className="kasm-terminal__input"
-          value={input}
-          onChange={e => setInput(e.target.value)}
+          ref={inputRef!}
+          class="kasm-terminal__input"
+          value={input()}
+          onInput={e => setInput(e.currentTarget.value)}
           onKeyDown={handleKeyDown}
-          placeholder={thinking ? `${agent.name} is thinking...` : `Ask ${agent.name}...`}
-          disabled={thinking}
-          autoFocus
-          spellCheck={false}
+          placeholder={thinking() ? `${props.agent.name} is thinking...` : `Ask ${props.agent.name}...`}
+          disabled={thinking()}
+          autofocus
+          spellcheck={false}
         />
       </div>
     </div>
@@ -215,7 +218,7 @@ const CursorLogo = (
   </svg>
 );
 
-// Devin / Cognition - stylized "D" in circle (no simple-icons entry, using brand-accurate representation)
+// Devin / Cognition - stylized "D" in circle
 const DevinLogo = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
     <circle cx="12" cy="12" r="11" fill="#06b6d4"/>
@@ -230,10 +233,10 @@ const JunieLogo = (
   </svg>
 );
 
-// Sourcegraph wildcard mark (no simple-icons, using brand-accurate asterisk representation)
+// Sourcegraph wildcard mark
 const CodyLogo = (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2v8.5M12 13.5V22M2 12h8.5M13.5 12H22M4.93 4.93l6.01 6.01M13.06 13.06l6.01 6.01M19.07 4.93l-6.01 6.01M10.94 13.06l-6.01 6.01" stroke="#ff5543" strokeWidth="2.5" strokeLinecap="round"/>
+    <path d="M12 2v8.5M12 13.5V22M2 12h8.5M13.5 12H22M4.93 4.93l6.01 6.01M13.06 13.06l6.01 6.01M19.07 4.93l-6.01 6.01M10.94 13.06l-6.01 6.01" stroke="#ff5543" stroke-width="2.5" stroke-linecap="round"/>
   </svg>
 );
 
@@ -286,30 +289,30 @@ const agents: Record<string, AgentConfig> = {
 
 // --- Exported components ---
 
-export function CodexApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.codex} />;
+export function CodexApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.codex} />;
 }
 
-export function ClaudeCodeApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.claudeCode} />;
+export function ClaudeCodeApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.claudeCode} />;
 }
 
-export function GeminiCodeApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.geminiCode} />;
+export function GeminiCodeApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.geminiCode} />;
 }
 
-export function CursorAgentApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.cursorAgent} />;
+export function CursorAgentApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.cursorAgent} />;
 }
 
-export function DevinApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.devin} />;
+export function DevinApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.devin} />;
 }
 
-export function JunieApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.junie} />;
+export function JunieApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.junie} />;
 }
 
-export function CodyApp({ windowId, onTitleChange }: AppProps) {
-  return <AgentTerminal windowId={windowId} onTitleChange={onTitleChange} agent={agents.cody} />;
+export function CodyApp(props: AppProps) {
+  return <AgentTerminal windowId={props.windowId} onTitleChange={props.onTitleChange} agent={agents.cody} />;
 }

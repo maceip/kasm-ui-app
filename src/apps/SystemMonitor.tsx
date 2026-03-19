@@ -3,7 +3,7 @@
 // Uses Performance API, memory API, and PerformanceObserver
 // ============================================================
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { createSignal, createEffect, onCleanup, For, Show, type JSX } from 'solid-js';
 import type { AppProps } from '../core/types';
 import './apps.css';
 
@@ -21,11 +21,11 @@ interface ProcessInfo {
 
 // Real metric hooks using browser Performance API
 function useRealCPU(interval = 1000) {
-  const [points, setPoints] = useState<MetricPoint[]>([]);
-  const lastIdle = useRef(0);
-  const lastTotal = useRef(0);
+  const [points, setPoints] = createSignal<MetricPoint[]>([]);
+  let lastIdle = 0;
+  let lastTotal = 0;
 
-  useEffect(() => {
+  createEffect(() => {
     let prev = performance.now();
     let busyTime = 0;
 
@@ -48,19 +48,19 @@ function useRealCPU(interval = 1000) {
       setPoints(prev => [...prev.slice(-59), { value: usage, timestamp: Date.now() }]);
     }, interval);
 
-    return () => {
+    onCleanup(() => {
       clearInterval(timer);
       cancelAnimationFrame(rafId);
-    };
-  }, [interval]);
+    });
+  });
 
   return points;
 }
 
 function useRealMemory(interval = 1000) {
-  const [points, setPoints] = useState<MetricPoint[]>([]);
+  const [points, setPoints] = createSignal<MetricPoint[]>([]);
 
-  useEffect(() => {
+  createEffect(() => {
     const timer = setInterval(() => {
       const perf = performance as any;
       if (perf.memory) {
@@ -77,53 +77,53 @@ function useRealMemory(interval = 1000) {
         setPoints(prev => [...prev.slice(-59), { value: Math.max(5, estimatedPct), timestamp: Date.now() }]);
       }
     }, interval);
-    return () => clearInterval(timer);
-  }, [interval]);
+    onCleanup(() => clearInterval(timer));
+  });
 
   return points;
 }
 
 function useNetworkActivity(interval = 1000) {
-  const [points, setPoints] = useState<MetricPoint[]>([]);
-  const lastCount = useRef(0);
-  const lastSize = useRef(0);
+  const [points, setPoints] = createSignal<MetricPoint[]>([]);
+  let lastCount = 0;
+  let lastSize = 0;
 
-  useEffect(() => {
+  createEffect(() => {
     const timer = setInterval(() => {
       const entries = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
       const totalSize = entries.reduce((sum, e) => sum + (e.transferSize || 0), 0);
-      const deltaSize = totalSize - lastSize.current;
-      lastSize.current = totalSize;
+      const deltaSize = totalSize - lastSize;
+      lastSize = totalSize;
       // Convert bytes/sec to Mbps (rough)
       const mbps = Math.max(0, (deltaSize * 8) / (interval * 1000));
       setPoints(prev => [...prev.slice(-59), { value: Math.min(100, mbps * 10), timestamp: Date.now() }]);
     }, interval);
-    return () => clearInterval(timer);
-  }, [interval]);
+    onCleanup(() => clearInterval(timer));
+  });
 
   return points;
 }
 
 function useDOMMetric(interval = 1000) {
-  const [points, setPoints] = useState<MetricPoint[]>([]);
+  const [points, setPoints] = createSignal<MetricPoint[]>([]);
 
-  useEffect(() => {
+  createEffect(() => {
     const timer = setInterval(() => {
       const nodeCount = document.querySelectorAll('*').length;
       // Normalize: 0-2000 nodes = 0-100%
       const pct = Math.min(100, (nodeCount / 2000) * 100);
       setPoints(prev => [...prev.slice(-59), { value: pct, timestamp: Date.now() }]);
     }, interval);
-    return () => clearInterval(timer);
-  }, [interval]);
+    onCleanup(() => clearInterval(timer));
+  });
 
   return points;
 }
 
 function useFPS(interval = 1000) {
-  const [points, setPoints] = useState<MetricPoint[]>([]);
+  const [points, setPoints] = createSignal<MetricPoint[]>([]);
 
-  useEffect(() => {
+  createEffect(() => {
     let frameCount = 0;
     let rafId: number;
     const countFrame = () => {
@@ -140,28 +140,34 @@ function useFPS(interval = 1000) {
       setPoints(prev => [...prev.slice(-59), { value: pct, timestamp: Date.now() }]);
     }, interval);
 
-    return () => {
+    onCleanup(() => {
       clearInterval(timer);
       cancelAnimationFrame(rafId);
-    };
-  }, [interval]);
+    });
+  });
 
   return points;
 }
 
-function MiniGraph({ points, color, label, unit = '%', maxLabel }: {
+function MiniGraph(props: {
   points: MetricPoint[];
   color: string;
   label: string;
   unit?: string;
   maxLabel?: string;
 }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const current = points[points.length - 1]?.value ?? 0;
+  let canvasRef!: HTMLCanvasElement;
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || points.length < 2) return;
+  const current = () => {
+    const pts = props.points;
+    return pts[pts.length - 1]?.value ?? 0;
+  };
+
+  createEffect(() => {
+    const pts = props.points;
+    const color = props.color;
+    const canvas = canvasRef;
+    if (!canvas || pts.length < 2) return;
     const ctx = canvas.getContext('2d')!;
     const w = canvas.width;
     const h = canvas.height;
@@ -183,12 +189,12 @@ function MiniGraph({ points, color, label, unit = '%', maxLabel }: {
     gradient.addColorStop(1, color.replace(')', ', 0.02)').replace('rgb', 'rgba'));
 
     ctx.beginPath();
-    points.forEach((p, i) => {
-      const x = (i / (points.length - 1)) * w;
+    pts.forEach((p, i) => {
+      const x = (i / (pts.length - 1)) * w;
       const y = h - (p.value / 100) * h;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
-    const lastX = ((points.length - 1) / (points.length - 1)) * w;
+    const lastX = ((pts.length - 1) / (pts.length - 1)) * w;
     ctx.lineTo(lastX, h);
     ctx.lineTo(0, h);
     ctx.closePath();
@@ -197,8 +203,8 @@ function MiniGraph({ points, color, label, unit = '%', maxLabel }: {
 
     // Line
     ctx.beginPath();
-    points.forEach((p, i) => {
-      const x = (i / (points.length - 1)) * w;
+    pts.forEach((p, i) => {
+      const x = (i / (pts.length - 1)) * w;
       const y = h - (p.value / 100) * h;
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
@@ -207,8 +213,8 @@ function MiniGraph({ points, color, label, unit = '%', maxLabel }: {
     ctx.stroke();
 
     // Current value dot
-    if (points.length > 0) {
-      const lastP = points[points.length - 1];
+    if (pts.length > 0) {
+      const lastP = pts[pts.length - 1];
       const x = w;
       const y = h - (lastP.value / 100) * h;
       ctx.beginPath();
@@ -216,18 +222,20 @@ function MiniGraph({ points, color, label, unit = '%', maxLabel }: {
       ctx.fillStyle = color;
       ctx.fill();
     }
-  }, [points, color]);
+  });
 
   return (
-    <div className="kasm-sysmon__metric" data-testid={`sysmon-${label.toLowerCase().replace(/\s/g, '-')}`}>
-      <div className="kasm-sysmon__metric-header">
-        <span className="kasm-sysmon__metric-label">{label}</span>
-        <span className="kasm-sysmon__metric-value" style={{ color }}>
-          {current.toFixed(1)}{unit}
+    <div class="kasm-sysmon__metric" data-testid={`sysmon-${props.label.toLowerCase().replace(/\s/g, '-')}`}>
+      <div class="kasm-sysmon__metric-header">
+        <span class="kasm-sysmon__metric-label">{props.label}</span>
+        <span class="kasm-sysmon__metric-value" style={{ color: props.color }}>
+          {current().toFixed(1)}{props.unit ?? '%'}
         </span>
       </div>
-      {maxLabel && <div className="kasm-sysmon__metric-sub">{maxLabel}</div>}
-      <canvas ref={canvasRef} width={300} height={80} className="kasm-sysmon__graph" />
+      <Show when={props.maxLabel}>
+        <div class="kasm-sysmon__metric-sub">{props.maxLabel}</div>
+      </Show>
+      <canvas ref={canvasRef!} width={300} height={80} class="kasm-sysmon__graph" />
     </div>
   );
 }
@@ -249,10 +257,11 @@ function extractName(url: string): string {
 }
 
 function ProcessTable() {
-  const [processes, setProcesses] = useState<ProcessInfo[]>([]);
-  const [sortBy, setSortBy] = useState<'cpu' | 'memory'>('cpu');
+  const [processes, setProcesses] = createSignal<ProcessInfo[]>([]);
+  const [sortBy, setSortBy] = createSignal<'cpu' | 'memory'>('cpu');
 
-  useEffect(() => {
+  createEffect(() => {
+    const currentSortBy = sortBy();
     const timer = setInterval(() => {
       const procs: ProcessInfo[] = [];
       let pid = 1;
@@ -292,83 +301,85 @@ function ProcessTable() {
       }
 
       // Sort by selected column
-      procs.sort((a, b) => b[sortBy] - a[sortBy]);
+      procs.sort((a, b) => b[currentSortBy] - a[currentSortBy]);
 
       setProcesses(procs);
     }, 2000);
-    return () => clearInterval(timer);
-  }, [sortBy]);
+    onCleanup(() => clearInterval(timer));
+  });
 
   return (
-    <div className="kasm-sysmon__processes">
-      <div className="kasm-sysmon__proc-header">
+    <div class="kasm-sysmon__processes">
+      <div class="kasm-sysmon__proc-header">
         <span style={{ flex: 1 }}>Resource</span>
         <span
-          style={{ width: 80, cursor: 'pointer', textAlign: 'right' }}
+          style={{ width: '80px', cursor: 'pointer', "text-align": 'right' }}
           onClick={() => setSortBy('cpu')}
         >
-          Dur ms {sortBy === 'cpu' ? '▼' : ''}
+          Dur ms {sortBy() === 'cpu' ? '\u25BC' : ''}
         </span>
         <span
-          style={{ width: 80, cursor: 'pointer', textAlign: 'right' }}
+          style={{ width: '80px', cursor: 'pointer', "text-align": 'right' }}
           onClick={() => setSortBy('memory')}
         >
-          Size KB {sortBy === 'memory' ? '▼' : ''}
+          Size KB {sortBy() === 'memory' ? '\u25BC' : ''}
         </span>
-        <span style={{ width: 50, textAlign: 'right' }}>PID</span>
+        <span style={{ width: '50px', "text-align": 'right' }}>PID</span>
       </div>
-      {processes.map(p => (
-        <div key={p.pid} className="kasm-sysmon__proc-row">
-          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</span>
-          <span style={{ width: 80, textAlign: 'right' }}>{p.cpu.toFixed(1)}</span>
-          <span style={{ width: 80, textAlign: 'right' }}>{p.memory.toFixed(1)}</span>
-          <span style={{ width: 50, textAlign: 'right', opacity: 0.5 }}>{p.pid}</span>
-        </div>
-      ))}
+      <For each={processes()}>
+        {(p) => (
+          <div class="kasm-sysmon__proc-row">
+            <span style={{ flex: 1, overflow: 'hidden', "text-overflow": 'ellipsis', "white-space": 'nowrap' }}>{p.name}</span>
+            <span style={{ width: '80px', "text-align": 'right' }}>{p.cpu.toFixed(1)}</span>
+            <span style={{ width: '80px', "text-align": 'right' }}>{p.memory.toFixed(1)}</span>
+            <span style={{ width: '50px', "text-align": 'right', opacity: 0.5 }}>{p.pid}</span>
+          </div>
+        )}
+      </For>
     </div>
   );
 }
 
-export function SystemMonitor({ windowId }: AppProps) {
-  const [tab, setTab] = useState<'graphs' | 'processes'>('graphs');
+export function SystemMonitor(props: AppProps) {
+  const [tab, setTab] = createSignal<'graphs' | 'processes'>('graphs');
   const cpu = useRealCPU();
   const memory = useRealMemory();
   const network = useNetworkActivity();
   const dom = useDOMMetric();
   const fps = useFPS();
 
-  const perf = performance as any;
-  const memInfo = perf.memory
-    ? `${(perf.memory.usedJSHeapSize / 1024 / 1024).toFixed(0)} MB / ${(perf.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(0)} MB`
-    : undefined;
+  const memInfo = () => {
+    const perf = performance as any;
+    return perf.memory
+      ? `${(perf.memory.usedJSHeapSize / 1024 / 1024).toFixed(0)} MB / ${(perf.memory.jsHeapSizeLimit / 1024 / 1024).toFixed(0)} MB`
+      : undefined;
+  };
 
   return (
-    <div className="kasm-app kasm-sysmon" data-testid="system-monitor">
-      <div className="kasm-sysmon__tabs">
+    <div class="kasm-app kasm-sysmon" data-testid="system-monitor">
+      <div class="kasm-sysmon__tabs">
         <button
-          className={`kasm-sysmon__tab ${tab === 'graphs' ? 'kasm-sysmon__tab--active' : ''}`}
+          class={`kasm-sysmon__tab ${tab() === 'graphs' ? 'kasm-sysmon__tab--active' : ''}`}
           onClick={() => setTab('graphs')}
         >
           Graphs
         </button>
         <button
-          className={`kasm-sysmon__tab ${tab === 'processes' ? 'kasm-sysmon__tab--active' : ''}`}
+          class={`kasm-sysmon__tab ${tab() === 'processes' ? 'kasm-sysmon__tab--active' : ''}`}
           onClick={() => setTab('processes')}
         >
           Processes
         </button>
       </div>
-      {tab === 'graphs' ? (
-        <div className="kasm-sysmon__graphs">
-          <MiniGraph points={cpu} color="rgb(108, 92, 231)" label="CPU" maxLabel="Main thread utilization" />
-          <MiniGraph points={memory} color="rgb(0, 184, 148)" label="Memory" maxLabel={memInfo} />
-          <MiniGraph points={fps} color="rgb(46, 204, 113)" label="FPS" unit=" fps" maxLabel="Frames per second (60 = 100%)" />
-          <MiniGraph points={dom} color="rgb(253, 203, 110)" label="DOM Nodes" unit="" maxLabel={`${document.querySelectorAll('*').length} nodes`} />
-          <MiniGraph points={network} color="rgb(0, 180, 216)" label="Network" unit="" maxLabel="Resource transfer activity" />
+      <Show when={tab() === 'graphs'} fallback={<ProcessTable />}>
+        <div class="kasm-sysmon__graphs">
+          <MiniGraph points={cpu()} color="rgb(108, 92, 231)" label="CPU" maxLabel="Main thread utilization" />
+          <MiniGraph points={memory()} color="rgb(0, 184, 148)" label="Memory" maxLabel={memInfo()} />
+          <MiniGraph points={fps()} color="rgb(46, 204, 113)" label="FPS" unit=" fps" maxLabel="Frames per second (60 = 100%)" />
+          <MiniGraph points={dom()} color="rgb(253, 203, 110)" label="DOM Nodes" unit="" maxLabel={`${document.querySelectorAll('*').length} nodes`} />
+          <MiniGraph points={network()} color="rgb(0, 180, 216)" label="Network" unit="" maxLabel="Resource transfer activity" />
         </div>
-      ) : (
-        <ProcessTable />
-      )}
+      </Show>
     </div>
   );
 }

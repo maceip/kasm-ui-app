@@ -2,12 +2,12 @@
 // Text Editor App - Basic code/text editor
 // ============================================================
 
-import { useState } from 'react';
+import { createSignal, createMemo, For } from 'solid-js';
 import type { AppProps } from '../core/types';
 import './apps.css';
 
 const SAMPLE = `// Welcome to Kasm UI Text Editor
-// Built with React 19 + TypeScript 5.9 + Vite 7
+// Built with SolidJS + TypeScript 5.9 + Vite 7
 
 function fibonacci(n: number): number {
   if (n <= 1) return n;
@@ -25,32 +25,32 @@ console.log(fibonacci(10)); // 55
 // - Window snap zones
 `;
 
-export function TextEditor({ windowId }: AppProps) {
-  const [content, setContent] = useState(SAMPLE);
-  const [fileName, setFileName] = useState('untitled.ts');
+export function TextEditor(props: AppProps) {
+  const [content, setContent] = createSignal(SAMPLE);
+  const [fileName, setFileName] = createSignal('untitled.ts');
 
-  const lines = content.split('\n');
-  const lineCount = lines.length;
+  const lines = createMemo(() => content().split('\n'));
+  const lineCount = createMemo(() => lines().length);
 
   return (
-    <div className="kasm-app kasm-text-editor">
-      <div className="kasm-text-editor__toolbar">
-        <span className="kasm-text-editor__filename">{fileName}</span>
-        <span className="kasm-text-editor__info">
-          {lineCount} lines · {content.length} chars
+    <div class="kasm-app kasm-text-editor">
+      <div class="kasm-text-editor__toolbar">
+        <span class="kasm-text-editor__filename">{fileName()}</span>
+        <span class="kasm-text-editor__info">
+          {lineCount()} lines · {content().length} chars
         </span>
       </div>
-      <div className="kasm-text-editor__body">
-        <div className="kasm-text-editor__gutter">
-          {lines.map((_, i) => (
-            <div key={i} className="kasm-text-editor__line-number">{i + 1}</div>
-          ))}
+      <div class="kasm-text-editor__body">
+        <div class="kasm-text-editor__gutter">
+          <For each={lines()}>{(_, i) => (
+            <div class="kasm-text-editor__line-number">{i() + 1}</div>
+          )}</For>
         </div>
         <textarea
-          className="kasm-text-editor__textarea"
-          value={content}
-          onChange={e => setContent(e.target.value)}
-          spellCheck={false}
+          class="kasm-text-editor__textarea"
+          value={content()}
+          onInput={e => setContent(e.currentTarget.value)}
+          spellcheck={false}
         />
       </div>
     </div>

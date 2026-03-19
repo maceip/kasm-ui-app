@@ -1,12 +1,13 @@
 // ============================================================
 // Layout Persistence - Save/load desktop state to localStorage
-// Debounced auto-save on every state change
+// Debounced auto-save via SolidJS createEffect
 // ============================================================
 
-import { useEffect, useRef } from 'react';
-import { useDesktopStore } from './store';
+import { createEffect, onCleanup } from 'solid-js';
+import { desktop, _setState, createWindow } from './store';
 import { appRegistry } from '../apps/registry';
 import type { PanelPosition, WindowState } from './types';
+import * as store from './store';
 
 const VALID_POSITIONS: PanelPosition[] = ['top', 'bottom', 'left', 'right'];
 const VALID_AUTOHIDE = ['never', 'always', 'intellihide'] as const;
@@ -70,11 +71,9 @@ interface SerializedLayout {
 }
 
 export function saveLayout(): void {
-  const state = useDesktopStore.getState();
-
   const layout: SerializedLayout = {
     version: 1,
-    windows: state.windows.map(w => ({
+    windows: (desktop.windows as WindowState[]).map(w => ({
       id: w.id,
       appId: w.appId,
       title: w.title,
@@ -95,17 +94,17 @@ export function saveLayout(): void {
       maximizable: w.maximizable,
       minimizable: w.minimizable,
     })),
-    workspaces: state.workspaces.map(ws => ({
+    workspaces: desktop.workspaces.map(ws => ({
       id: ws.id,
       name: ws.name,
       windowIds: [...ws.windowIds],
     })),
-    activeWorkspaceId: state.activeWorkspaceId,
-    activeThemeId: state.activeThemeId,
+    activeWorkspaceId: desktop.activeWorkspaceId,
+    activeThemeId: desktop.activeThemeId,
     panelConfig: {
-      position: state.panelConfig.position,
-      height: state.panelConfig.height,
-      autohide: state.panelConfig.autohide,
+      position: desktop.panelConfig.position,
+      height: desktop.panelConfig.height,
+      autohide: desktop.panelConfig.autohide,
     },
   };
 
@@ -124,39 +123,35 @@ export function loadLayout(): void {
     const layout: SerializedLayout = JSON.parse(raw);
     if (layout.version !== 1) return;
 
-    const state = useDesktopStore.getState();
-
     // Restore workspaces
     if (layout.workspaces && layout.workspaces.length > 0) {
-      useDesktopStore.setState({
-        workspaces: layout.workspaces,
-        activeWorkspaceId: layout.activeWorkspaceId || layout.workspaces[0].id,
-      });
+      _setState('workspaces', layout.workspaces);
+      _setState('activeWorkspaceId', layout.activeWorkspaceId || layout.workspaces[0].id);
     }
 
     // Restore theme
     if (layout.activeThemeId) {
-      state.setTheme(layout.activeThemeId);
+      store.setTheme(layout.activeThemeId);
     }
 
-    // Restore panel config (partial - keep applets from default)
+    // Restore panel config
     if (layout.panelConfig) {
       const pos = layout.panelConfig.position;
       const ah = layout.panelConfig.autohide;
-      state.setPanelConfig({
+      store.setPanelConfig({
         ...(isValidPosition(pos) ? { position: pos } : {}),
         height: layout.panelConfig.height,
         ...(isValidAutohide(ah) ? { autohide: ah } : {}),
       });
     }
 
-    // Restore windows using the app registry
+    // Restore windows
     if (layout.windows && layout.windows.length > 0) {
       for (const savedWindow of layout.windows) {
         const app = appRegistry.find(a => a.id === savedWindow.appId);
-        if (!app) continue; // Skip removed/unregistered apps
+        if (!app) continue;
 
-        state.createWindow(app, {
+        createWindow(app, {
           id: savedWindow.id,
           title: savedWindow.title,
           icon: savedWindow.icon,
@@ -184,30 +179,29 @@ export function loadLayout(): void {
   }
 }
 
-export function usePersistence(): void {
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+export function setupPersistence(): void {
+  // Load layout immediately
+  loadLayout();
 
-  // Load layout on mount
-  useEffect(() => {
-    loadLayout();
-  }, []);
+  // Auto-save on state changes (debounced) via reactive tracking
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  // Auto-save on state changes (debounced)
-  useEffect(() => {
-    const unsub = useDesktopStore.subscribe(() => {
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-      timerRef.current = setTimeout(() => {
-        saveLayout();
-      }, DEBOUNCE_MS);
-    });
+  createEffect(() => {
+    // Track all relevant state by reading it
+    void desktop.windows.length;
+    void desktop.workspaces.length;
+    void desktop.activeWorkspaceId;
+    void desktop.activeThemeId;
+    void desktop.panelConfig.position;
+    void desktop.panelConfig.height;
+    void desktop.panelConfig.autohide;
 
-    return () => {
-      unsub();
-      if (timerRef.current) {
-        clearTimeout(timerRef.current);
-      }
-    };
-  }, []);
+    // Debounced save
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => saveLayout(), DEBOUNCE_MS);
+  });
+
+  onCleanup(() => {
+    if (timer) clearTimeout(timer);
+  });
 }

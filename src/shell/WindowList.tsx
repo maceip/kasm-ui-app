@@ -3,36 +3,37 @@
 // Shows running apps in the active workspace
 // ============================================================
 
-import { useDesktopStore } from '../core/store';
+import { createMemo, For } from 'solid-js';
+import { desktop, focusWindow, minimizeWindow } from '../core/store';
+import type { WindowState } from '../core/types';
 
 export function WindowList() {
-  const windows = useDesktopStore(s => s.windows);
-  const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
-  const workspaces = useDesktopStore(s => s.workspaces);
-
-  const activeWs = workspaces.find(ws => ws.id === activeWorkspaceId);
-  const visibleWindows = windows.filter(w => activeWs?.windowIds.includes(w.id));
+  const visibleWindows = createMemo(() => {
+    const activeWs = desktop.workspaces.find(ws => ws.id === desktop.activeWorkspaceId);
+    return (desktop.windows as WindowState[]).filter(w => activeWs?.windowIds.includes(w.id));
+  });
 
   return (
     <>
-      {visibleWindows.map(win => (
-        <button
-          key={win.id}
-          className={`kasm-panel-btn ${win.focused ? 'kasm-panel-btn--focused' : ''} ${win.state === 'minimized' ? '' : 'kasm-panel-btn--active'}`}
-          onClick={() => {
-            if (win.focused && win.state !== 'minimized') {
-              useDesktopStore.getState().minimizeWindow(win.id);
-            } else {
-              useDesktopStore.getState().focusWindow(win.id);
-            }
-          }}
-          title={win.title}
-          style={{ maxWidth: 180 }}
-        >
-          <span className="kasm-panel-btn__icon">{win.icon}</span>
-          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{win.title}</span>
-        </button>
-      ))}
+      <For each={visibleWindows()}>
+        {(win) => (
+          <button
+            class={`kasm-panel-btn ${win.focused ? 'kasm-panel-btn--focused' : ''} ${win.state === 'minimized' ? '' : 'kasm-panel-btn--active'}`}
+            onClick={() => {
+              if (win.focused && win.state !== 'minimized') {
+                minimizeWindow(win.id);
+              } else {
+                focusWindow(win.id);
+              }
+            }}
+            title={win.title}
+            style={{ "max-width": '180px' }}
+          >
+            <span class="kasm-panel-btn__icon">{win.icon}</span>
+            <span style={{ overflow: 'hidden', "text-overflow": 'ellipsis' }}>{win.title}</span>
+          </button>
+        )}
+      </For>
     </>
   );
 }

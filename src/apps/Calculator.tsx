@@ -2,29 +2,29 @@
 // Calculator - Simple calculator app
 // ============================================================
 
-import { useState } from 'react';
+import { createSignal, For } from 'solid-js';
 import type { AppProps } from '../core/types';
 import './apps.css';
 
-export function Calculator({ windowId }: AppProps) {
-  const [display, setDisplay] = useState('0');
-  const [prev, setPrev] = useState<number | null>(null);
-  const [op, setOp] = useState<string | null>(null);
-  const [resetNext, setResetNext] = useState(false);
+export function Calculator(props: AppProps) {
+  const [display, setDisplay] = createSignal('0');
+  const [prev, setPrev] = createSignal<number | null>(null);
+  const [op, setOp] = createSignal<string | null>(null);
+  const [resetNext, setResetNext] = createSignal(false);
 
   const handleDigit = (d: string) => {
-    if (resetNext) {
+    if (resetNext()) {
       setDisplay(d);
       setResetNext(false);
     } else {
-      setDisplay(display === '0' ? d : display + d);
+      setDisplay(display() === '0' ? d : display() + d);
     }
   };
 
   const handleOp = (newOp: string) => {
-    const current = parseFloat(display);
-    if (prev !== null && op) {
-      const result = calculate(prev, current, op);
+    const current = parseFloat(display());
+    if (prev() !== null && op()) {
+      const result = calculate(prev()!, current, op()!);
       setDisplay(String(result));
       setPrev(result);
     } else {
@@ -35,9 +35,9 @@ export function Calculator({ windowId }: AppProps) {
   };
 
   const handleEquals = () => {
-    if (prev === null || !op) return;
-    const current = parseFloat(display);
-    const result = calculate(prev, current, op);
+    if (prev() === null || !op()) return;
+    const current = parseFloat(display());
+    const result = calculate(prev()!, current, op()!);
     setDisplay(String(result));
     setPrev(null);
     setOp(null);
@@ -52,8 +52,8 @@ export function Calculator({ windowId }: AppProps) {
   };
 
   const buttons = [
-    ['C', '±', '%', '÷'],
-    ['7', '8', '9', '×'],
+    ['C', '\u00B1', '%', '\u00F7'],
+    ['7', '8', '9', '\u00D7'],
     ['4', '5', '6', '-'],
     ['1', '2', '3', '+'],
     ['0', '.', '='],
@@ -63,32 +63,31 @@ export function Calculator({ windowId }: AppProps) {
     if (btn >= '0' && btn <= '9' || btn === '.') handleDigit(btn);
     else if (btn === 'C') handleClear();
     else if (btn === '=') handleEquals();
-    else if (btn === '±') setDisplay(String(-parseFloat(display)));
-    else if (btn === '%') setDisplay(String(parseFloat(display) / 100));
+    else if (btn === '\u00B1') setDisplay(String(-parseFloat(display())));
+    else if (btn === '%') setDisplay(String(parseFloat(display()) / 100));
     else handleOp(btn);
   };
 
   return (
-    <div className="kasm-app kasm-calculator">
-      <div className="kasm-calc__display">{display}</div>
-      <div className="kasm-calc__buttons">
-        {buttons.map((row, ri) => (
-          <div key={ri} className="kasm-calc__row">
-            {row.map(btn => (
+    <div class="kasm-app kasm-calculator">
+      <div class="kasm-calc__display">{display()}</div>
+      <div class="kasm-calc__buttons">
+        <For each={buttons}>{(row) => (
+          <div class="kasm-calc__row">
+            <For each={row}>{(btn) => (
               <button
-                key={btn}
-                className={`kasm-calc__btn ${
-                  ['÷', '×', '-', '+', '='].includes(btn) ? 'kasm-calc__btn--op' : ''
+                class={`kasm-calc__btn ${
+                  ['\u00F7', '\u00D7', '-', '+', '='].includes(btn) ? 'kasm-calc__btn--op' : ''
                 } ${btn === '0' ? 'kasm-calc__btn--wide' : ''} ${
-                  ['C', '±', '%'].includes(btn) ? 'kasm-calc__btn--func' : ''
+                  ['C', '\u00B1', '%'].includes(btn) ? 'kasm-calc__btn--func' : ''
                 }`}
                 onClick={() => handleButton(btn)}
               >
                 {btn}
               </button>
-            ))}
+            )}</For>
           </div>
-        ))}
+        )}</For>
       </div>
     </div>
   );
@@ -98,8 +97,8 @@ function calculate(a: number, b: number, op: string): number {
   switch (op) {
     case '+': return a + b;
     case '-': return a - b;
-    case '×': return a * b;
-    case '÷': return b !== 0 ? a / b : 0;
+    case '\u00D7': return a * b;
+    case '\u00F7': return b !== 0 ? a / b : 0;
     default: return b;
   }
 }

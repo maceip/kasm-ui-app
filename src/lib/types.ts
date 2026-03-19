@@ -63,7 +63,7 @@ export interface AppDefinition {
   icon: string;
   category: string;
   description?: string;
-  component: React.ComponentType<AppProps>;
+  component: (props: AppProps) => any;
   singleton?: boolean;
 }
 

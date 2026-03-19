@@ -3,9 +3,10 @@
 // Each corner triggers a configurable action after 200ms hover
 // ============================================================
 
-import { useRef, useCallback } from 'react';
-import { useDesktopStore } from '../core/store';
+import type { JSX } from 'solid-js';
+import { desktop, setExpoMode, showDesktop, restoreDesktop } from '../core/store';
 import type { HotCornerAction } from '../core/store';
+import type { WindowState } from '../core/types';
 import './hotCorners.css';
 
 const CORNER_SIZE = 8;
@@ -13,43 +14,42 @@ const HOVER_DELAY = 200;
 
 type Corner = 'topLeft' | 'topRight' | 'bottomLeft' | 'bottomRight';
 
-const cornerPositions: Record<Corner, { testId: string; style: React.CSSProperties }> = {
+const cornerPositions: Record<Corner, { testId: string; style: JSX.CSSProperties }> = {
   topLeft: {
     testId: 'hot-corner-tl',
-    style: { top: 0, left: 0 },
+    style: { top: '0px', left: '0px' },
   },
   topRight: {
     testId: 'hot-corner-tr',
-    style: { top: 0, right: 0 },
+    style: { top: '0px', right: '0px' },
   },
   bottomLeft: {
     testId: 'hot-corner-bl',
-    style: { bottom: 0, left: 0 },
+    style: { bottom: '0px', left: '0px' },
   },
   bottomRight: {
     testId: 'hot-corner-br',
-    style: { bottom: 0, right: 0 },
+    style: { bottom: '0px', right: '0px' },
   },
 };
 
 function executeAction(action: HotCornerAction) {
-  const store = useDesktopStore.getState();
   switch (action) {
     case 'expo':
-      store.setExpoMode(store.expoMode === 'expo' ? 'off' : 'expo');
+      setExpoMode(desktop.expoMode === 'expo' ? 'off' : 'expo');
       break;
     case 'scale':
-      store.setExpoMode(store.expoMode === 'scale' ? 'off' : 'scale');
+      setExpoMode(desktop.expoMode === 'scale' ? 'off' : 'scale');
       break;
     case 'show-desktop': {
-      const activeWs = store.workspaces.find(ws => ws.id === store.activeWorkspaceId);
-      const hasVisible = activeWs && store.windows.some(
+      const activeWs = desktop.workspaces.find(ws => ws.id === desktop.activeWorkspaceId);
+      const hasVisible = activeWs && (desktop.windows as WindowState[]).some(
         w => activeWs.windowIds.includes(w.id) && w.state !== 'minimized'
       );
       if (hasVisible) {
-        store.showDesktop();
+        showDesktop();
       } else {
-        store.restoreDesktop();
+        restoreDesktop();
       }
     }
       break;
@@ -58,40 +58,39 @@ function executeAction(action: HotCornerAction) {
   }
 }
 
-function HotCorner({ corner }: { corner: Corner }) {
-  const action = useDesktopStore(s => s.hotCornerActions[corner]);
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const flashRef = useRef<HTMLDivElement>(null);
+function HotCorner(props: { corner: Corner }) {
+  let timerRef: ReturnType<typeof setTimeout> | null = null;
+  let flashRef: HTMLDivElement | undefined;
 
-  const onEnter = useCallback(() => {
+  const onEnter = () => {
+    const action = desktop.hotCornerActions[props.corner];
     if (action === 'none') return;
-    timerRef.current = setTimeout(() => {
+    timerRef = setTimeout(() => {
       executeAction(action);
-      // Visual flash feedback
-      if (flashRef.current) {
-        flashRef.current.classList.add('kasm-hot-corner--flash');
+      if (flashRef) {
+        flashRef.classList.add('kasm-hot-corner--flash');
         setTimeout(() => {
-          flashRef.current?.classList.remove('kasm-hot-corner--flash');
+          flashRef?.classList.remove('kasm-hot-corner--flash');
         }, 200);
       }
     }, HOVER_DELAY);
-  }, [action]);
+  };
 
-  const onLeave = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
+  const onLeave = () => {
+    if (timerRef) {
+      clearTimeout(timerRef);
+      timerRef = null;
     }
-  }, []);
+  };
 
-  const { testId, style } = cornerPositions[corner];
+  const { testId, style } = cornerPositions[props.corner];
 
   return (
     <div
       ref={flashRef}
-      className="kasm-hot-corner"
+      class="kasm-hot-corner"
       data-testid={testId}
-      style={{ ...style, width: CORNER_SIZE, height: CORNER_SIZE }}
+      style={{ ...style, width: `${CORNER_SIZE}px`, height: `${CORNER_SIZE}px` }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
     />

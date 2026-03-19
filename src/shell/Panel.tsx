@@ -2,14 +2,10 @@
 // Panel - Cinnamon-style taskbar with 3-zone layout
 // Supports bottom/top positioning with applet slots
 // Supports intellihide, always-hide, and never-hide modes
-//
-// SOLID 2.0 ALIGNMENT:
-// - No useCallback (stable function identity)
-// - Effect split into compute/apply phases
 // ============================================================
 
-import { useState, useEffect, useRef } from 'react';
-import { useDesktopStore } from '../core/store';
+import { createSignal, createMemo } from 'solid-js';
+import { desktop } from '../core/store';
 import { AppMenuButton } from './AppMenu';
 import { WindowList } from './WindowList';
 import { WorkspaceSwitcher } from './WorkspaceSwitcher';
@@ -17,10 +13,9 @@ import { SystemTray } from './SystemTray';
 import { Clock } from './Clock';
 import { NotificationApplet } from './NotificationCenter';
 import { LocalFolderIndicator } from './LocalFolderIndicator';
+import type { WindowState } from '../core/types';
 import './panel.css';
 
-// --- Portable overlap detection (framework-agnostic) ---
-// Solid 2.0: this becomes the COMPUTE phase of a two-phase createEffect.
 function computeOverlap(
   autohide: string,
   position: string,
@@ -51,68 +46,51 @@ function computeOverlap(
 }
 
 export function Panel() {
-  const config = useDesktopStore(s => s.panelConfig);
-  const windows = useDesktopStore(s => s.windows);
-  const workspaces = useDesktopStore(s => s.workspaces);
-  const activeWorkspaceId = useDesktopStore(s => s.activeWorkspaceId);
-  const sidebarOpen = useDesktopStore(s => s.agentSidebarOpen);
+  const [hovered, setHovered] = createSignal(false);
+  let panelRef: HTMLDivElement | undefined;
 
-  const [hidden, setHidden] = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const hidden = createMemo(() => {
+    const config = desktop.panelConfig;
+    if (config.autohide === 'never') return false;
+    if (config.autohide === 'always') return true;
+    const activeWs = desktop.workspaces.find(ws => ws.id === desktop.activeWorkspaceId);
+    const activeWindowIds = activeWs?.windowIds ?? [];
+    return computeOverlap(
+      config.autohide, config.position, config.height,
+      desktop.windows as WindowState[], activeWindowIds,
+    );
+  });
 
-  // --- Autohide effect (compute/apply split) ---
-  // Solid 2.0 pattern:
-  //   createEffect(
-  //     () => computeOverlap(config, windows, ...),  // COMPUTE: pure, tracked
-  //     (shouldHide) => setHidden(shouldHide)          // APPLY: side effect
-  //   )
-  useEffect(() => {
-    // COMPUTE phase
-    let shouldHide: boolean;
-    if (config.autohide === 'never') {
-      shouldHide = false;
-    } else if (config.autohide === 'always') {
-      shouldHide = true;
-    } else {
-      const activeWs = workspaces.find(ws => ws.id === activeWorkspaceId);
-      const activeWindowIds = activeWs?.windowIds ?? [];
-      shouldHide = computeOverlap(
-        config.autohide, config.position, config.height,
-        windows, activeWindowIds,
-      );
-    }
-    // APPLY phase
-    setHidden(shouldHide);
-  }, [config.autohide, config.position, config.height, windows, workspaces, activeWorkspaceId]);
+  const shouldSlide = () => hidden() && !hovered();
 
-  const shouldSlide = hidden && !hovered;
-
-  const isBottom = config.position === 'bottom';
-  const translateValue = shouldSlide
-    ? (isBottom ? `translateY(${config.height - 4}px)` : `translateY(-${config.height - 4}px)`)
-    : 'translateY(0)';
+  const translateValue = () => {
+    if (!shouldSlide()) return 'translateY(0)';
+    const isBottom = desktop.panelConfig.position === 'bottom';
+    return isBottom
+      ? `translateY(${desktop.panelConfig.height - 4}px)`
+      : `translateY(-${desktop.panelConfig.height - 4}px)`;
+  };
 
   return (
     <>
       <div
         ref={panelRef}
-        className={`kasm-panel kasm-panel--${config.position} ${shouldSlide ? 'kasm-panel--hidden' : ''} ${!sidebarOpen ? 'kasm-panel--no-sidebar' : ''}`}
+        class={`kasm-panel kasm-panel--${desktop.panelConfig.position} ${shouldSlide() ? 'kasm-panel--hidden' : ''} ${!desktop.agentSidebarOpen ? 'kasm-panel--no-sidebar' : ''}`}
         style={{
-          height: config.height,
-          transform: translateValue,
+          height: `${desktop.panelConfig.height}px`,
+          transform: translateValue(),
         }}
         data-testid="kasm-panel"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
       >
-        <div className="kasm-panel__zone kasm-panel__zone--left">
+        <div class="kasm-panel__zone kasm-panel__zone--left">
           <AppMenuButton />
         </div>
-        <div className="kasm-panel__zone kasm-panel__zone--center">
+        <div class="kasm-panel__zone kasm-panel__zone--center">
           <WindowList />
         </div>
-        <div className="kasm-panel__zone kasm-panel__zone--right">
+        <div class="kasm-panel__zone kasm-panel__zone--right">
           <WorkspaceSwitcher />
           <LocalFolderIndicator />
           <SystemTray />
@@ -120,10 +98,9 @@ export function Panel() {
           <NotificationApplet />
         </div>
       </div>
-      {/* Thin trigger strip at panel edge for hover reveal */}
-      {hidden && !hovered && (
+      {hidden() && !hovered() && (
         <div
-          className={`kasm-panel-trigger kasm-panel-trigger--${config.position}`}
+          class={`kasm-panel-trigger kasm-panel-trigger--${desktop.panelConfig.position}`}
           onMouseEnter={() => setHovered(true)}
         />
       )}
