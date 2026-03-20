@@ -131,6 +131,7 @@ export function LiquidGlass(props: LiquidGlassProps) {
   };
 
   const isFirefox = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
+  const isTouchDevice = typeof navigator !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
   const transform = () => {
     if (active() && props.onClick) return 'scale(0.97)';
@@ -160,14 +161,14 @@ export function LiquidGlass(props: LiquidGlassProps) {
         cursor: props.onClick ? 'pointer' : undefined,
         ...props.style,
       }}
-      onMouseMove={handleMouseMove}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setMouseOffset({ x: 0, y: 0 }); }}
-      onMouseDown={() => setActive(true)}
-      onMouseUp={() => setActive(false)}
+      onMouseMove={!isTouchDevice ? handleMouseMove : undefined}
+      onMouseEnter={!isTouchDevice ? () => setHovered(true) : undefined}
+      onMouseLeave={!isTouchDevice ? () => { setHovered(false); setMouseOffset({ x: 0, y: 0 }); } : undefined}
+      onPointerDown={() => setActive(true)}
+      onPointerUp={() => setActive(false)}
       onClick={props.onClick}
     >
-      <GlassFilter
+      {!isTouchDevice && <GlassFilter
         id={filterId}
         scale={overLight() ? displacementScale() * 0.5 : displacementScale()}
         aberration={aberrationIntensity()}
@@ -175,14 +176,14 @@ export function LiquidGlass(props: LiquidGlassProps) {
         h={glassSize().height}
         mode={mode()}
         shaderUrl={shaderUrl()}
-      />
+      />}
 
       <span
         style={{
           position: 'absolute',
           inset: '0',
           "border-radius": `${cornerRadius()}px`,
-          filter: isFirefox ? undefined : `url(#${filterId})`,
+          filter: (isFirefox || isTouchDevice) ? undefined : `url(#${filterId})`,
           "backdrop-filter": `blur(${(overLight() ? 12 : 4) + blurAmount() * 32}px) saturate(${saturation()}%)`,
           "-webkit-backdrop-filter": `blur(${(overLight() ? 12 : 4) + blurAmount() * 32}px) saturate(${saturation()}%)`,
           overflow: 'hidden',

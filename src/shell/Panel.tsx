@@ -81,6 +81,7 @@ export function Panel() {
         data-testid="kasm-panel"
         onMouseEnter={() => setHovered(true)}
         onMouseLeave={() => setHovered(false)}
+        onTouchStart={() => setHovered(true)}
       >
         <div class="kasm-panel__zone kasm-panel__zone--left">
           <AppMenuButton />
@@ -100,6 +101,7 @@ export function Panel() {
         <div
           class={`kasm-panel-trigger kasm-panel-trigger--${desktop.panelConfig.position}`}
           onMouseEnter={() => setHovered(true)}
+          onTouchStart={() => setHovered(true)}
         />
       )}
     </>

@@ -33,8 +33,8 @@ export function Window(props: WindowProps) {
   const isMaximized = () => props.win.state === 'maximized';
   const isMinimized = () => props.win.state === 'minimized';
 
-  // --- Drag start ---
-  const onDragStart = (e: MouseEvent) => {
+  // --- Drag start (pointer events for mouse + touch) ---
+  const onDragStart = (e: PointerEvent) => {
     if (isMaximized()) {
       restoreWindow(props.win.id);
       dragOffset = { x: 400, y: 15 };
@@ -43,6 +43,7 @@ export function Window(props: WindowProps) {
     }
     setDragging(true);
     focusWindow(props.win.id);
+    (e.target as Element)?.setPointerCapture?.(e.pointerId);
     e.preventDefault();
   };
 
@@ -50,7 +51,7 @@ export function Window(props: WindowProps) {
   createEffect(() => {
     if (!dragging()) return;
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const x = e.clientX - dragOffset.x;
       const y = e.clientY - dragOffset.y;
       moveWindow(props.win.id, Math.max(0, x), Math.max(0, y));
@@ -58,7 +59,7 @@ export function Window(props: WindowProps) {
       setSnapPreview(zone);
     };
 
-    const onUp = (e: MouseEvent) => {
+    const onUp = (e: PointerEvent) => {
       setDragging(false);
       const zone = detectSnapZone(e.clientX, e.clientY, window.innerWidth, window.innerHeight);
       if (zone) {
@@ -67,21 +68,22 @@ export function Window(props: WindowProps) {
       setSnapPreview(null);
     };
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', () => { setDragging(false); setSnapPreview(null); });
     document.body.style.cursor = 'grabbing';
     document.body.classList.add('kasm-dragging');
 
     onCleanup(() => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       document.body.style.cursor = '';
       document.body.classList.remove('kasm-dragging');
     });
   });
 
   // --- Resize start ---
-  const onResizeStart = (dir: ResizeDir, e: MouseEvent) => {
+  const onResizeStart = (dir: ResizeDir, e: PointerEvent) => {
     if (!props.win.resizable) return;
     setResizing(dir);
     resizeStart = {
@@ -90,6 +92,7 @@ export function Window(props: WindowProps) {
       wx: props.win.x, wy: props.win.y,
     };
     focusWindow(props.win.id);
+    (e.target as Element)?.setPointerCapture?.(e.pointerId);
     e.preventDefault();
     e.stopPropagation();
   };
@@ -99,7 +102,7 @@ export function Window(props: WindowProps) {
     const dir = resizing();
     if (!dir) return;
 
-    const onMove = (e: MouseEvent) => {
+    const onMove = (e: PointerEvent) => {
       const dx = e.clientX - resizeStart.x;
       const dy = e.clientY - resizeStart.y;
       const s = resizeStart;
@@ -118,15 +121,16 @@ export function Window(props: WindowProps) {
 
     const onUp = () => setResizing(null);
 
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+    document.addEventListener('pointercancel', () => setResizing(null));
     const cursor = getResizeCursor(dir);
     document.body.style.cursor = cursor;
     document.body.classList.add('kasm-resizing');
 
     onCleanup(() => {
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
       document.body.style.cursor = '';
       document.body.classList.remove('kasm-resizing');
     });
@@ -165,7 +169,7 @@ export function Window(props: WindowProps) {
               height: `${props.win.height}px`,
               "z-index": props.win.zIndex,
             }}
-            onMouseDown={() => focusWindow(props.win.id)}
+            onPointerDown={() => focusWindow(props.win.id)}
           >
             <TitleBar
               win={props.win}
@@ -178,14 +182,14 @@ export function Window(props: WindowProps) {
             </div>
 
             <Show when={props.win.resizable && !isMaximized()}>
-              <div class="kasm-window__resize kasm-window__resize--n" onMouseDown={e => onResizeStart('n', e)} />
-              <div class="kasm-window__resize kasm-window__resize--s" onMouseDown={e => onResizeStart('s', e)} />
-              <div class="kasm-window__resize kasm-window__resize--e" onMouseDown={e => onResizeStart('e', e)} />
-              <div class="kasm-window__resize kasm-window__resize--w" onMouseDown={e => onResizeStart('w', e)} />
-              <div class="kasm-window__resize kasm-window__resize--ne" onMouseDown={e => onResizeStart('ne', e)} />
-              <div class="kasm-window__resize kasm-window__resize--nw" onMouseDown={e => onResizeStart('nw', e)} />
-              <div class="kasm-window__resize kasm-window__resize--se" onMouseDown={e => onResizeStart('se', e)} />
-              <div class="kasm-window__resize kasm-window__resize--sw" onMouseDown={e => onResizeStart('sw', e)} />
+              <div class="kasm-window__resize kasm-window__resize--n" onPointerDown={e => onResizeStart('n', e)} />
+              <div class="kasm-window__resize kasm-window__resize--s" onPointerDown={e => onResizeStart('s', e)} />
+              <div class="kasm-window__resize kasm-window__resize--e" onPointerDown={e => onResizeStart('e', e)} />
+              <div class="kasm-window__resize kasm-window__resize--w" onPointerDown={e => onResizeStart('w', e)} />
+              <div class="kasm-window__resize kasm-window__resize--ne" onPointerDown={e => onResizeStart('ne', e)} />
+              <div class="kasm-window__resize kasm-window__resize--nw" onPointerDown={e => onResizeStart('nw', e)} />
+              <div class="kasm-window__resize kasm-window__resize--se" onPointerDown={e => onResizeStart('se', e)} />
+              <div class="kasm-window__resize kasm-window__resize--sw" onPointerDown={e => onResizeStart('sw', e)} />
             </Show>
           </div>
         </>

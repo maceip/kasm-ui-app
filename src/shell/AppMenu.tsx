@@ -52,14 +52,14 @@ export function AppMenu() {
   // Close on click outside
   createEffect(() => {
     if (!desktop.appMenuOpen) return;
-    const handler = (e: MouseEvent) => {
+    const handler = (e: PointerEvent | MouseEvent) => {
       if (menuRef && !menuRef.contains(e.target as Node) &&
           !(e.target as Element)?.closest('.kasm-app-menu-btn')) {
         closeAppMenu();
       }
     };
-    document.addEventListener('mousedown', handler);
-    onCleanup(() => document.removeEventListener('mousedown', handler));
+    document.addEventListener('pointerdown', handler);
+    onCleanup(() => document.removeEventListener('pointerdown', handler));
   });
 
   const filteredApps = createMemo(() => {

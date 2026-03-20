@@ -9,7 +9,7 @@ import type { WindowState } from '../core/types';
 
 interface TitleBarProps {
   win: WindowState;
-  onDragStart: (e: MouseEvent) => void;
+  onDragStart: (e: PointerEvent) => void;
   onDoubleClick: () => void;
   onPopout?: () => void;
 }
@@ -20,7 +20,7 @@ export function TitleBar(props: TitleBarProps) {
   return (
     <div
       class={`kasm-titlebar ${props.win.focused ? 'kasm-titlebar--focused' : ''}`}
-      onMouseDown={props.onDragStart}
+      onPointerDown={props.onDragStart}
       onDblClick={props.onDoubleClick}
     >
       <div class="kasm-titlebar__left">
@@ -30,7 +30,7 @@ export function TitleBar(props: TitleBarProps) {
         <span class="kasm-titlebar__title">{props.win.title}</span>
       </div>
 
-      <div class="kasm-titlebar__controls" onMouseDown={e => e.stopPropagation()}>
+      <div class="kasm-titlebar__controls" onPointerDown={e => e.stopPropagation()}>
         <Show when={props.win.minimizable}>
           <button
             class="kasm-titlebar__btn kasm-titlebar__btn--minimize"

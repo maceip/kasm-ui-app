@@ -42,7 +42,7 @@ export function Desktop() {
   return (
     <div
       class={`kasm-desktop ${!desktop.agentSidebarOpen ? 'kasm-desktop--no-sidebar' : ''}`}
-      onMouseDown={() => closeAppMenu()}
+      onPointerDown={() => closeAppMenu()}
     >
       <For each={visibleWindows()}>
         {(win) => <WindowWithApp win={win} />}
