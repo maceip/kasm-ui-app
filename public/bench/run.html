@@ -125,7 +125,8 @@ async function measure(actionFn) {
 }
 
 function click(el) {
-  el.dispatchEvent(new W().MouseEvent('click', { bubbles: true, cancelable: true }));
+  const w = W();
+  el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
 }
 
 // Wait for an element to appear in the iframe DOM (up to timeout ms)
@@ -437,9 +438,10 @@ async function startBenchmark() {
     const tb = D().querySelector('.kasm-window--focused .kasm-titlebar') || D().querySelector('.kasm-titlebar');
     if (tb) {
       // Restore first
-      tb.dispatchEvent(new W().MouseEvent('dblclick', { bubbles: true }));
+      const w2 = W();
+      tb.dispatchEvent(new w2.MouseEvent('dblclick', { bubbles: true }));
       await sleep(300);
-      tb.dispatchEvent(new W().MouseEvent('dblclick', { bubbles: true }));
+      tb.dispatchEvent(new w2.MouseEvent('dblclick', { bubbles: true }));
       await sleep(300);
 
       const rect = tb.getBoundingClientRect();
