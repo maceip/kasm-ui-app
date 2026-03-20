@@ -261,10 +261,10 @@ function renderResults() {
   const allKeys = [...new Set([...Object.keys(rr), ...Object.keys(sr)])];
 
   // Categorize
-  const loadKeys = ['Cold Load (wall clock)', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)'];
-  const stressKeys = ['App Launch (avg, 15 wins)', 'App Launch (last of 15)', 'Focus Switch (avg, 15 wins)', 'Drag over 14 windows (avg/frame)', 'Resize over 14 windows (avg/frame)', 'Minimize (avg, 15 wins)', 'Minimize (last of 15)', 'Restore from Panel (avg, 15 wins)', 'Close Window (avg, 15 wins)', 'Close Window (last of 15)'];
-  const wmKeys = ['Launch Terminal', 'Maximize Window', 'Restore from Maximize', 'Window Drag (avg/frame)', 'Window Resize SE (avg/frame)', 'Snap Drag to Edge (avg/frame)', 'Snap Commit', 'Snap Restore (dblclick)'];
-  const layoutKeys = ['Split Pane Resize (avg/frame)', 'Tab Reorder DnD', 'Expo Open (15 wins)', 'Expo Close (15 wins)', 'Scale Open (15 wins)', 'Scale Close (15 wins)'];
+  const loadKeys = ['Cold Load', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)'];
+  const stressKeys = ['App Launch (avg)', 'App Launch (1st)', 'App Launch (10th)', 'Tile 10 Windows (grid)', 'Focus Switch (avg, 10 wins)', 'Drag over 9 windows (avg/frame)', 'Resize over 9 windows (avg/frame)', 'Minimize (avg, 10 wins)', 'Minimize (last)', 'Restore from Panel (avg, 10 wins)', 'Close Window (avg)', 'Close Window (last)'];
+  const wmKeys = ['Maximize Window', 'Restore from Maximize', 'Snap Drag (avg/frame)', 'Snap Commit (left)', 'Snap Commit (right)', 'Restore from Snap'];
+  const layoutKeys = ['Split Pane Resize (avg/frame)', 'Tab Reorder DnD', 'Expo Open (10 wins)', 'Expo Close (10 wins)', 'Scale Open (10 wins)', 'Scale Close (10 wins)'];
   const cacheKeys = ['Resources from Cache', 'Resources from Network'];
   const memKeys = allKeys.filter(k => k.includes('Heap'));
   const categorized = new Set([...loadKeys, ...stressKeys, ...wmKeys, ...layoutKeys, ...cacheKeys, ...memKeys]);
