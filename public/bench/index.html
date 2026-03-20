@@ -178,26 +178,6 @@ function startSequentialBenchmark() {
   }, 300);
 }
 
-(function checkPhase() {
-  const phase = localStorage.getItem('bench_phase');
-  if (phase === 'react') {
-    const reactData = localStorage.getItem('bench_react');
-    if (reactData) {
-      localStorage.setItem('bench_phase', 'solid');
-      setStatus('React done. Starting SolidJS benchmark...', 'running');
-      setTimeout(() => {
-        location.href = 'run.html?fw=solid&return=index.html';
-      }, 500);
-      return;
-    }
-  }
-  if (phase === 'solid') {
-    localStorage.removeItem('bench_phase');
-    setStatus('Benchmark complete!', 'done');
-  }
-  renderResults();
-})();
-
 // -------------------------------------------------------
 // Why each category matters — shown below section titles
 // -------------------------------------------------------
@@ -402,6 +382,29 @@ function renderTable(title, keys, rr, sr) {
   html += '</tbody></table>';
   return html;
 }
+
+// -------------------------------------------------------
+// Boot: check phase and render on page load
+// -------------------------------------------------------
+(function checkPhase() {
+  const phase = localStorage.getItem('bench_phase');
+  if (phase === 'react') {
+    const reactData = localStorage.getItem('bench_react');
+    if (reactData) {
+      localStorage.setItem('bench_phase', 'solid');
+      setStatus('React done. Starting SolidJS benchmark...', 'running');
+      setTimeout(() => {
+        location.href = 'run.html?fw=solid&return=index.html';
+      }, 500);
+      return;
+    }
+  }
+  if (phase === 'solid') {
+    localStorage.removeItem('bench_phase');
+    setStatus('Benchmark complete!', 'done');
+  }
+  renderResults();
+})();
 </script>
 
 </body>

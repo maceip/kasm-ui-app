@@ -21,6 +21,7 @@ const testIntellihide = require('./test-intellihide.cjs');
 const testExpo = require('./test-expo.cjs');
 const testHotCorners = require('./test-hot-corners.cjs');
 const testPersistence = require('./test-persistence.cjs');
+const testBenchmark = require('./test-benchmark.cjs');
 
 async function main() {
   console.log('Building app...');
@@ -75,6 +76,9 @@ async function main() {
 
     console.log('\n━━━ 12. Layout Persistence ━━━');
     await testPersistence();
+
+    console.log('\n━━━ 13. Benchmark Runner ━━━');
+    await testBenchmark();
 
   } finally {
     await closeBrowser();
