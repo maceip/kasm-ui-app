@@ -15,10 +15,29 @@ import { HotCorners } from './shell/HotCorners';
 import { AgentSidebar, AgentFAB } from './shell/AgentSidebar';
 import {
   desktop, addNotification, switchWorkspace, setExpoMode,
+  createWindow,
 } from './core/store';
 import { setupPersistence } from './core/persistence';
+import { appRegistry } from './apps/registry';
 import { vfs } from './apps/vfs';
 import './styles/global.css';
+
+function spawn100Windows() {
+  const apps = appRegistry.filter(a => !a.singleton);
+  const cols = 10;
+  for (let i = 0; i < 100; i++) {
+    const app = apps[i % apps.length];
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    createWindow(app, {
+      x: 20 + col * 60,
+      y: 20 + row * 40,
+      width: 400,
+      height: 300,
+      focused: false,
+    });
+  }
+}
 
 export default function App() {
   // Set up layout persistence (auto-save/load)
@@ -34,6 +53,9 @@ export default function App() {
     document.documentElement.dataset.panelPosition = desktop.panelConfig.position;
     document.documentElement.style.setProperty('--kasm-panel-h', `${desktop.panelConfig.height}px`);
   });
+
+  // Spawn 100 windows on startup
+  spawn100Windows();
 
   // Welcome notification on first load
   const timer1 = setTimeout(() => {
