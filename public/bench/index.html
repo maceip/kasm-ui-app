@@ -69,19 +69,46 @@
 
     .bar-chart { margin: 1.5rem 0; }
     .bar-row { display: flex; align-items: center; gap: 0.75rem; margin: 0.4rem 0; font-size: 0.8rem; }
-    .bar-label { width: 180px; text-align: right; flex-shrink: 0; }
+    .bar-label { width: 220px; text-align: right; flex-shrink: 0; font-size: 0.75rem; }
     .bar-track { flex: 1; height: 22px; background: var(--surface); border-radius: 4px; overflow: hidden; position: relative; display: flex; }
     .bar-react { background: var(--react); height: 100%; opacity: 0.7; transition: width 0.5s; }
     .bar-solid { background: var(--solid); height: 100%; opacity: 0.7; transition: width 0.5s; }
     .bar-val { position: absolute; right: 6px; top: 2px; font-size: 0.7rem; color: var(--text); font-weight: 600; }
 
-    .section-title { font-size: 1rem; font-weight: 600; margin: 2rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+    .section-title { font-size: 1rem; font-weight: 600; margin: 2rem 0 0.5rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+    .section-why {
+      font-size: 0.78rem; color: var(--muted); line-height: 1.5;
+      margin-bottom: 0.75rem; padding: 0.5rem 0.75rem;
+      border-left: 3px solid var(--border); background: rgba(22,27,34,0.5);
+    }
+    .section-why code { color: var(--accent); font-size: 0.75rem; }
+
+    .cache-banner {
+      display: flex; gap: 1rem; margin-bottom: 1rem;
+    }
+    .cache-card {
+      flex: 1; padding: 0.6rem 1rem; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 6px; font-size: 0.8rem;
+    }
+    .cache-bar {
+      height: 6px; border-radius: 3px; margin-top: 0.4rem; display: flex; overflow: hidden;
+    }
+    .cache-bar-net { background: var(--green); }
+    .cache-bar-hit { background: var(--yellow); }
+
+    .scorecard {
+      display: flex; gap: 1rem; margin-bottom: 1.5rem;
+    }
+    .scorecard-item {
+      flex: 1; padding: 1rem; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; text-align: center;
+    }
+    .scorecard-val { font-size: 1.8rem; font-weight: 800; }
+    .scorecard-label { font-size: 0.75rem; color: var(--muted); margin-top: 0.25rem; }
 
     .meta { font-size: 0.75rem; color: var(--muted); margin-top: 1rem; }
-
     .empty-state { text-align: center; padding: 3rem; color: var(--muted); }
     .empty-state p { margin: 0.5rem 0; }
-
     footer { margin-top: 2rem; padding: 1rem 0; border-top: 1px solid var(--border); text-align: center; color: var(--muted); font-size: 0.8rem; }
   </style>
 </head>
@@ -99,10 +126,11 @@
 <div class="container">
 
   <div class="explanation">
-    <strong>How it works:</strong> Each framework is benchmarked in complete isolation — React loads
-    first in a dedicated full-page runner, measures all interactions, then unloads. SolidJS runs
-    next under identical conditions. This ensures fair comparison of cold load, time-to-interactive,
-    and interaction latency without resource contention.
+    <strong>How it works:</strong> Service workers and browser caches are nuked before each run.
+    Each framework loads in a cache-busted iframe, opens 15 windows, then runs drag, resize,
+    snap, focus cycling, minimize/restore, expo/scale views, tab reorder, and batch close.
+    React runs first, then SolidJS, under identical conditions. Per-resource cache hit/miss
+    is tracked via <code>PerformanceResourceTiming.transferSize</code>.
   </div>
 
   <div class="status-bar">
@@ -115,7 +143,7 @@
   </div>
 
   <footer>
-    Kasm UI Benchmark &middot; <a href="../docs/">Docs</a> &middot; <a href="https://github.com/maceip/kasm-ui-app">GitHub</a>
+    Kasm UI Benchmark &middot; <a href="../">App</a> &middot; <a href="https://github.com/maceip/kasm-ui-app">GitHub</a>
   </footer>
 
 </div>
@@ -139,19 +167,9 @@ function clearResults() {
   setStatus('Results cleared. Ready to run.', 'idle');
 }
 
-// -------------------------------------------------------
-// Sequential orchestration
-//
-// Phase 1: Navigate to run.html?fw=react → it benchmarks React, stores in localStorage, redirects back
-// Phase 2: Navigate to run.html?fw=solid → same for SolidJS
-// Phase 3: Both results in localStorage → render comparison
-// -------------------------------------------------------
 function startSequentialBenchmark() {
-  // Check current phase
   const phase = localStorage.getItem('bench_phase');
-
   if (!phase) {
-    // Start fresh: clear old results, begin with React
     localStorage.removeItem('bench_react');
     localStorage.removeItem('bench_solid');
     localStorage.setItem('bench_phase', 'react');
@@ -162,12 +180,9 @@ function startSequentialBenchmark() {
   }
 }
 
-// On page load, check if we're mid-sequence
 (function checkPhase() {
   const phase = localStorage.getItem('bench_phase');
-
   if (phase === 'react') {
-    // React just finished, now run SolidJS
     const reactData = localStorage.getItem('bench_react');
     if (reactData) {
       localStorage.setItem('bench_phase', 'solid');
@@ -178,18 +193,42 @@ function startSequentialBenchmark() {
       return;
     }
   }
-
   if (phase === 'solid') {
-    // SolidJS just finished — show results
     localStorage.removeItem('bench_phase');
     setStatus('Benchmark complete!', 'done');
   }
-
   renderResults();
 })();
 
 // -------------------------------------------------------
-// Render comparison
+// Why each category matters — shown below section titles
+// -------------------------------------------------------
+const WHY = {
+  'Load Performance': `<strong>Bundle size gap:</strong> SolidJS runtime is ~7 KB; React + ReactDOM is ~45 KB.
+    On a 3G connection (~400 KB/s) that's 10 ms vs 110 ms just for the framework.
+    Solid also compiles away the component abstraction, so there's less JS to parse and evaluate.`,
+
+  '15-Window Stress Test': `<strong>This is where the VDOM tax shows up.</strong>
+    React re-renders every <code>&lt;Window&gt;</code> component on focus change (all 15 get diffed).
+    SolidJS only patches the <code>class</code> attribute on the 2 affected DOM nodes.
+    "Last of 15" times show degradation — React slows as the component tree grows; Solid stays flat.`,
+
+  'Window Management': `<strong>Continuous updates (60 fps):</strong> Each <code>mousemove</code> during drag/resize
+    updates x/y/width/height state. React re-renders the entire <code>&lt;Window&gt;</code> subtree 60x/sec
+    and diffs the VDOM each time. SolidJS compiles <code>style={\`left:\${x()}px\`}</code> into a direct
+    DOM mutation — no component re-execution, no diffing, no reconciliation.`,
+
+  'Layout & Views': `<strong>List reconciliation & overlay rendering:</strong>
+    Tab reorder triggers array mutation — React runs its key-based reconciler on the tab list.
+    Solid's <code>&lt;For&gt;</code> tracks items by reference and moves the actual DOM node.
+    Expo/Scale views create a full-screen overlay with N mini-windows — tests mount/unmount cost.`,
+
+  'Memory': `<strong>No virtual DOM in memory:</strong> React maintains a fiber tree + VDOM tree for every
+    component. SolidJS stores only signals and their subscriptions. The gap grows with window count.`,
+};
+
+// -------------------------------------------------------
+// Render
 // -------------------------------------------------------
 function renderResults() {
   const reactRaw = localStorage.getItem('bench_react');
@@ -208,7 +247,6 @@ function renderResults() {
   const react = reactRaw ? JSON.parse(reactRaw) : null;
   const solid = solidRaw ? JSON.parse(solidRaw) : null;
 
-  // Only one framework done so far
   if (!react || !solid) {
     const done = react || solid;
     resultsArea.innerHTML = `
@@ -222,7 +260,7 @@ function renderResults() {
   const sr = solid.results;
   const allKeys = [...new Set([...Object.keys(rr), ...Object.keys(sr)])];
 
-  // Categorize metrics
+  // Categorize
   const loadKeys = ['Cold Load (wall clock)', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)'];
   const stressKeys = ['App Launch (avg, 15 wins)', 'App Launch (last of 15)', 'Focus Switch (avg, 15 wins)', 'Drag over 14 windows (avg/frame)', 'Resize over 14 windows (avg/frame)', 'Minimize (avg, 15 wins)', 'Minimize (last of 15)', 'Restore from Panel (avg, 15 wins)', 'Close Window (avg, 15 wins)', 'Close Window (last of 15)'];
   const wmKeys = ['Launch Terminal', 'Maximize Window', 'Restore from Maximize', 'Window Drag (avg/frame)', 'Window Resize SE (avg/frame)', 'Snap Drag to Edge (avg/frame)', 'Snap Commit', 'Snap Restore (dblclick)'];
@@ -234,32 +272,51 @@ function renderResults() {
 
   let html = '';
 
-  // Cache status banner
+  // --- Scorecard: overall wins ---
+  let solidWins = 0, reactWins = 0, ties = 0;
+  for (const k of allKeys) {
+    if (cacheKeys.includes(k)) continue;
+    const rv = rr[k], sv = sr[k];
+    if (typeof rv !== 'number' || typeof sv !== 'number' || rv <= 0) continue;
+    const pct = (rv - sv) / rv * 100;
+    if (pct > 3) solidWins++;
+    else if (pct < -3) reactWins++;
+    else ties++;
+  }
+  html += '<div class="scorecard">';
+  html += `<div class="scorecard-item"><div class="scorecard-val" style="color:var(--solid)">${solidWins}</div><div class="scorecard-label">SolidJS wins</div></div>`;
+  html += `<div class="scorecard-item"><div class="scorecard-val" style="color:var(--muted)">${ties}</div><div class="scorecard-label">Ties (&lt;3%)</div></div>`;
+  html += `<div class="scorecard-item"><div class="scorecard-val" style="color:var(--react)">${reactWins}</div><div class="scorecard-label">React wins</div></div>`;
+  html += '</div>';
+
+  // --- Cache banner ---
   const rCache = react.cacheInfo || {};
   const sCache = solid.cacheInfo || {};
   if (rCache.resources_total || sCache.resources_total) {
-    html += '<div style="display:flex;gap:1rem;margin-bottom:1rem;">';
-    if (rCache.resources_total) {
-      const pct = Math.round((rCache.resources_cached || 0) / rCache.resources_total * 100);
-      html += `<div style="flex:1;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;">
-        <span style="color:var(--react);font-weight:700;">React</span>: ${rCache.resources_network}/${rCache.resources_total} from network
-        <span style="color:${pct > 50 ? 'var(--yellow,#d29922)' : 'var(--green)'};font-weight:600;">(${pct}% cached)</span>
-      </div>`;
-    }
-    if (sCache.resources_total) {
-      const pct = Math.round((sCache.resources_cached || 0) / sCache.resources_total * 100);
-      html += `<div style="flex:1;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;">
-        <span style="color:var(--solid);font-weight:700;">SolidJS</span>: ${sCache.resources_network}/${sCache.resources_total} from network
-        <span style="color:${pct > 50 ? 'var(--yellow,#d29922)' : 'var(--green)'};font-weight:600;">(${pct}% cached)</span>
+    html += '<div class="cache-banner">';
+    for (const [label, color, ci] of [['React', 'var(--react)', rCache], ['SolidJS', 'var(--solid)', sCache]]) {
+      if (!ci.resources_total) continue;
+      const netPct = Math.round((ci.resources_network || 0) / ci.resources_total * 100);
+      const cachePct = 100 - netPct;
+      html += `<div class="cache-card">
+        <span style="color:${color};font-weight:700;">${label}</span>:
+        ${ci.resources_network} network / ${ci.resources_cached} cached (${ci.resources_total} total)
+        <div class="cache-bar">
+          <div class="cache-bar-net" style="width:${netPct}%"></div>
+          <div class="cache-bar-hit" style="width:${cachePct}%"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:0.65rem;margin-top:2px;color:var(--muted);">
+          <span style="color:var(--green);">${netPct}% fresh</span>
+          <span style="color:var(--yellow);">${cachePct}% cached</span>
+        </div>
       </div>`;
     }
     html += '</div>';
   }
 
-  // Summary bar chart
+  // --- Bar chart ---
   html += '<h3 class="section-title">Visual Comparison</h3>';
   html += '<div class="bar-chart">';
-  // Only show timing metrics in bar chart (skip cache/resource counts)
   const barKeys = allKeys.filter(k => !cacheKeys.includes(k) && typeof rr[k] === 'number' && typeof sr[k] === 'number');
   for (const key of barKeys) {
     const rv = rr[key], sv = sr[key];
@@ -283,21 +340,27 @@ function renderResults() {
   html += '<div style="display:flex;gap:1.5rem;justify-content:center;margin-top:0.5rem;font-size:0.75rem;">';
   html += '<span style="color:var(--react);">&#9632; React</span>';
   html += '<span style="color:var(--solid);">&#9632; SolidJS</span>';
-  html += '<span style="color:var(--muted);">(lower is better)</span>';
+  html += '<span style="color:var(--muted);">(lower is better, all values in ms)</span>';
   html += '</div></div>';
 
-  // Tables by category
-  html += renderTable('Load Performance', loadKeys, rr, sr);
-  html += renderTable('15-Window Stress Test', stressKeys, rr, sr);
-  html += renderTable('Window Management', wmKeys, rr, sr);
-  html += renderTable('Layout & Views', layoutKeys, rr, sr);
+  // --- Tables with explanations ---
+  const categories = [
+    ['Load Performance', loadKeys],
+    ['15-Window Stress Test', stressKeys],
+    ['Window Management', wmKeys],
+    ['Layout & Views', layoutKeys],
+  ];
+  for (const [title, keys] of categories) {
+    html += renderTable(title, keys, rr, sr);
+  }
   if (otherKeys.length) html += renderTable('Other', otherKeys, rr, sr);
   if (memKeys.length) html += renderTable('Memory', memKeys, rr, sr);
 
   // Meta
   html += `<div class="meta">
     Tested: ${new Date(react.timestamp).toLocaleString()}<br/>
-    UA: ${react.userAgent}
+    UA: ${react.userAgent}<br/>
+    SW + Cache API cleared before each run. URLs cache-busted with timestamp + random suffix.
   </div>`;
 
   resultsArea.innerHTML = html;
@@ -305,9 +368,10 @@ function renderResults() {
 
 function renderTable(title, keys, rr, sr) {
   let html = `<h3 class="section-title">${title}</h3>`;
+  if (WHY[title]) {
+    html += `<div class="section-why">${WHY[title]}</div>`;
+  }
   html += '<table><thead><tr><th>Metric</th><th class="col-react">React</th><th class="col-solid">SolidJS</th><th>Delta</th></tr></thead><tbody>';
-
-  let solidWins = 0, reactWins = 0;
 
   for (const key of keys) {
     const rv = rr[key], sv = sr[key];
@@ -315,15 +379,15 @@ function renderTable(title, keys, rr, sr) {
 
     const rStr = rv != null ? (typeof rv === 'number' ? rv.toFixed(2) : rv) : '\u2014';
     const sStr = sv != null ? (typeof sv === 'number' ? sv.toFixed(2) : sv) : '\u2014';
-    const unit = key.includes('KB') ? ' KB' : key.includes('MB') ? ' MB' : ' ms';
+    const unit = key.includes('KB') ? ' KB' : key.includes('MB') ? ' MB' : key.includes('Resources') ? '' : ' ms';
 
     let delta = '', cls = 'neutral', isWinner = false;
     if (typeof rv === 'number' && typeof sv === 'number' && rv > 0) {
       const pct = ((rv - sv) / rv * 100);
       if (pct > 3) {
-        cls = 'faster'; delta = `SolidJS ${pct.toFixed(0)}% faster`; solidWins++; isWinner = true;
+        cls = 'faster'; delta = `SolidJS ${pct.toFixed(0)}% faster`; isWinner = true;
       } else if (pct < -3) {
-        cls = 'slower'; delta = `React ${(-pct).toFixed(0)}% faster`; reactWins++;
+        cls = 'slower'; delta = `React ${(-pct).toFixed(0)}% faster`;
       } else {
         delta = '~same';
       }
