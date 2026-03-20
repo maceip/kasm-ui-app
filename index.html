@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
 
     <!-- PWA -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="./manifest.json" />
     <meta name="theme-color" content="#1a1a2e" media="(prefers-color-scheme: dark)" />
     <meta name="theme-color" content="#2c3e50" media="(prefers-color-scheme: light)" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -14,8 +14,8 @@
     <meta name="apple-mobile-web-app-title" content="Kasm" />
 
     <!-- Icons -->
-    <link rel="icon" type="image/svg+xml" href="/icons/icon-512.svg" />
-    <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+    <link rel="icon" type="image/svg+xml" href="./icons/icon-512.svg" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.svg" />
 
     <!-- SEO / Social -->
     <meta name="description" content="Kasm UI - A bleeding-edge SolidJS desktop environment with docking, collaborative editing, virtual filesystem, and window management." />
@@ -30,7 +30,7 @@
       // Register service worker
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js', { scope: '/' })
+          navigator.serviceWorker.register('./sw.js')
             .then(reg => {
               console.log('[SW] Registered:', reg.scope);
               // Check for updates periodically
