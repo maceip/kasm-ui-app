@@ -9,23 +9,30 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', monospace; }
     #bar {
-      display: flex; align-items: center; gap: 0.75rem;
+      display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap;
       padding: 0.5rem 1rem; background: var(--surface); border-bottom: 1px solid var(--border);
       font-size: 0.85rem;
     }
     #bar .label { font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
     #bar .label.react { color: #61dafb; }
     #bar .label.solid { color: var(--green); }
-    #status { color: var(--muted); flex: 1; }
+    #status { color: var(--muted); flex: 1; min-width: 200px; }
     #progress { width: 120px; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
     #progress-fill { height: 100%; width: 0%; background: var(--accent); transition: width 0.3s; }
-    iframe { width: 100%; height: calc(100vh - 38px); border: none; }
+    #cache-badge {
+      font-size: 0.7rem; padding: 2px 8px; border-radius: 999px; font-weight: 700;
+    }
+    .cache-cold { background: var(--green); color: #000; }
+    .cache-warm { background: #d29922; color: #000; }
+    .cache-unknown { background: var(--muted); color: #000; }
+    iframe { width: 100%; height: calc(100vh - 42px); border: none; }
   </style>
 </head>
 <body>
 
 <div id="bar">
   <span id="fw-label" class="label">...</span>
+  <span id="cache-badge" class="cache-unknown">CACHE: ?</span>
   <span id="status">Initializing...</span>
   <div id="progress"><div id="progress-fill"></div></div>
 </div>
@@ -33,18 +40,25 @@
 
 <script>
 // -------------------------------------------------------
-// Single-framework benchmark runner v2
-// Cache-busted, SW-bypassed, with complex interaction tests
-// for docking, tab reorder, window resize, split pane, snap
+// Kasm Benchmark Runner v3
+//
+// - Nukes SW + Cache API before load for true cold start
+// - Detects whether the load actually hit cache or network
+// - Launches apps by name via the real app menu UI
+// - Opens 15+ windows to stress the window manager
+// - Tests: drag, resize, snap, focus cycling, minimize/restore,
+//   maximize/tile, split pane, tab reorder, expo, scale,
+//   and batch close
 // -------------------------------------------------------
 const params = new URLSearchParams(location.search);
-const fw = params.get('fw'); // 'react' or 'solid'
+const fw = params.get('fw');
 const returnTo = params.get('return') || 'index.html';
 
 const frame = document.getElementById('app-frame');
 const statusEl = document.getElementById('status');
 const fwLabel = document.getElementById('fw-label');
 const progressFill = document.getElementById('progress-fill');
+const cacheBadge = document.getElementById('cache-badge');
 
 if (!fw || !['react', 'solid'].includes(fw)) {
   statusEl.textContent = 'Error: ?fw=react or ?fw=solid required';
@@ -59,15 +73,13 @@ function setStatus(msg) { statusEl.textContent = msg; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // -------------------------------------------------------
-// Cache-busting: unregister all SWs & clear caches
+// Cache nuking
 // -------------------------------------------------------
 async function nukeCache() {
-  // Unregister all service workers so they can't serve cached assets
   if ('serviceWorker' in navigator) {
     const regs = await navigator.serviceWorker.getRegistrations();
     await Promise.all(regs.map(r => r.unregister()));
   }
-  // Wipe all Cache API entries
   if ('caches' in window) {
     const keys = await caches.keys();
     await Promise.all(keys.map(k => caches.delete(k)));
@@ -75,9 +87,9 @@ async function nukeCache() {
 }
 
 async function prepareThenRun() {
-  setStatus('Clearing caches for clean measurement...');
+  setStatus('Nuking service workers & cache...');
   await nukeCache();
-  await sleep(200);
+  await sleep(300);
   await startBenchmark();
 }
 
@@ -88,8 +100,7 @@ function waitForLoad(iframe) {
   return new Promise(resolve => {
     const check = () => {
       try {
-        const doc = iframe.contentDocument || iframe.contentWindow.document;
-        if (doc.readyState === 'complete') return resolve();
+        if (iframe.contentDocument?.readyState === 'complete') return resolve();
       } catch(e) {}
       setTimeout(check, 50);
     };
@@ -97,126 +108,78 @@ function waitForLoad(iframe) {
   });
 }
 
-// Measure: action → wait for two animation frames (paint commit)
 async function measureInteraction(iframe, actionFn) {
-  const win = iframe.contentWindow;
-  const t0 = win.performance.now();
-  actionFn(win, win.document);
-  await new Promise(r => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
-  return win.performance.now() - t0;
+  const w = iframe.contentWindow;
+  const t0 = w.performance.now();
+  actionFn(w, w.document);
+  await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
+  return w.performance.now() - t0;
 }
 
-function findEl(doc, selector, fallbackText) {
-  let el = selector ? doc.querySelector(selector) : null;
-  if (!el && fallbackText) {
-    for (const node of doc.querySelectorAll('span, button, div, a')) {
-      if (node.textContent.trim() === fallbackText) { el = node; break; }
+// Find an element by selector, or by matching .kasm-app-menu__app-name text
+function findAppByName(doc, name) {
+  for (const el of doc.querySelectorAll('.kasm-app-menu__app-name')) {
+    if (el.textContent.trim() === name) return el.closest('.kasm-app-menu__app');
+  }
+  return null;
+}
+
+// Open the app menu, find an app by its exact name, click it, return timing
+async function launchApp(name) {
+  const d = frame.contentWindow.document;
+  const w = frame.contentWindow;
+
+  // Open menu if closed
+  const menu = d.querySelector('.kasm-app-menu');
+  if (!menu || menu.offsetParent === null || getComputedStyle(menu).display === 'none') {
+    const menuBtn = d.querySelector('.kasm-app-menu-btn');
+    if (menuBtn) {
+      menuBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      await sleep(250);
     }
   }
-  return el;
-}
 
-async function clickAndMeasure(iframe, selector, fallbackText) {
-  const el = findEl(iframe.contentWindow.document, selector, fallbackText);
-  if (!el) return null;
-  return measureInteraction(iframe, (win) => {
-    el.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
-  });
-}
-
-async function typeAndMeasure(iframe, selector, text) {
-  const win = iframe.contentWindow;
-  const el = win.document.querySelector(selector);
-  if (!el) return null;
-  el.focus();
-  const times = [];
-  for (const ch of text) {
-    const t0 = win.performance.now();
-    el.dispatchEvent(new win.KeyboardEvent('keydown', { key: ch, bubbles: true }));
-    el.dispatchEvent(new win.KeyboardEvent('keypress', { key: ch, bubbles: true }));
-    el.value = (el.value || '') + ch;
-    el.dispatchEvent(new win.InputEvent('input', { data: ch, bubbles: true }));
-    el.dispatchEvent(new win.KeyboardEvent('keyup', { key: ch, bubbles: true }));
-    await new Promise(r => win.requestAnimationFrame(r));
-    times.push(win.performance.now() - t0);
+  // Click "All" category to see every app
+  const cats = d.querySelectorAll('.kasm-app-menu__category');
+  if (cats.length > 0) {
+    cats[0].dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+    await sleep(150);
   }
-  return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+
+  // Find and click the app
+  const appEl = findAppByName(d, name);
+  if (!appEl) return null;
+
+  const t0 = w.performance.now();
+  appEl.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+  await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
+  const elapsed = w.performance.now() - t0;
+  await sleep(200);
+  return elapsed;
 }
 
-// Continuous mouse-drag on an element (for titlebar drag, resize handles)
+// Continuous mouse drag
 async function dragAndMeasure(iframe, el, dx, dy, steps) {
-  const win = iframe.contentWindow;
+  const w = iframe.contentWindow;
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   const sx = rect.left + rect.width / 2;
   const sy = rect.top + rect.height / 2;
   const times = [];
 
-  el.dispatchEvent(new win.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+  el.dispatchEvent(new w.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
   for (let i = 1; i <= steps; i++) {
-    const t0 = win.performance.now();
-    win.document.dispatchEvent(new win.MouseEvent('mousemove', {
+    const t0 = w.performance.now();
+    w.document.dispatchEvent(new w.MouseEvent('mousemove', {
       clientX: sx + (dx * i / steps), clientY: sy + (dy * i / steps), bubbles: true
     }));
-    await new Promise(r => win.requestAnimationFrame(r));
-    times.push(win.performance.now() - t0);
+    await new Promise(r => w.requestAnimationFrame(r));
+    times.push(w.performance.now() - t0);
   }
-  win.document.dispatchEvent(new win.MouseEvent('mouseup', {
+  w.document.dispatchEvent(new w.MouseEvent('mouseup', {
     clientX: sx + dx, clientY: sy + dy, bubbles: true
   }));
   return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
-}
-
-// HTML5 DnD sequence for tab reorder / dock
-async function dndAndMeasure(iframe, srcEl, destEl, dataTransferData) {
-  const win = iframe.contentWindow;
-  if (!srcEl || !destEl) return null;
-
-  const srcRect = srcEl.getBoundingClientRect();
-  const destRect = destEl.getBoundingClientRect();
-  const sx = srcRect.left + srcRect.width / 2;
-  const sy = srcRect.top + srcRect.height / 2;
-  const dx = destRect.left + destRect.width / 2;
-  const dy = destRect.top + destRect.height / 2;
-
-  // Create a DataTransfer-like shim
-  function makeDT() {
-    const data = {};
-    return {
-      types: Object.keys(dataTransferData || {}),
-      dropEffect: 'none',
-      effectAllowed: 'move',
-      setData(k, v) { data[k] = v; },
-      getData(k) { return data[k] || (dataTransferData && dataTransferData[k]) || ''; },
-      setDragImage() {},
-    };
-  }
-
-  const dt = makeDT();
-  const t0 = win.performance.now();
-
-  srcEl.dispatchEvent(new win.DragEvent('dragstart', {
-    clientX: sx, clientY: sy, bubbles: true, dataTransfer: dt,
-  }));
-
-  destEl.dispatchEvent(new win.DragEvent('dragenter', {
-    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
-  }));
-
-  destEl.dispatchEvent(new win.DragEvent('dragover', {
-    clientX: dx, clientY: dy, bubbles: true, cancelable: true, dataTransfer: dt,
-  }));
-
-  destEl.dispatchEvent(new win.DragEvent('drop', {
-    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
-  }));
-
-  srcEl.dispatchEvent(new win.DragEvent('dragend', {
-    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
-  }));
-
-  await new Promise(r => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
-  return win.performance.now() - t0;
 }
 
 function getLoadMetrics(iframe) {
@@ -242,21 +205,36 @@ function getMemory(iframe) {
   return null;
 }
 
+// Detect if the main document was served from cache
+function detectCacheStatus(iframe) {
+  try {
+    const perf = iframe.contentWindow.performance;
+    const nav = perf.getEntriesByType('navigation')[0];
+    if (!nav) return 'unknown';
+    // transferSize === 0 means served from cache (SW or HTTP)
+    if (nav.transferSize === 0) return 'warm';
+    // Also check if any resources were served from cache
+    const resources = perf.getEntriesByType('resource');
+    const total = resources.length;
+    const cached = resources.filter(r => r.transferSize === 0).length;
+    return { label: 'cold', total, cached, network: total - cached };
+  } catch(e) { return 'unknown'; }
+}
+
 // -------------------------------------------------------
-// Main benchmark sequence
+// MAIN BENCHMARK
 // -------------------------------------------------------
 async function startBenchmark() {
   const results = {};
-  // Cache-bust: append timestamp so the browser can't use HTTP cache
-  const cacheBust = '?_cb=' + Date.now();
+  const cacheInfo = {};
+
+  const cacheBust = '?_cb=' + Date.now() + '&_r=' + Math.random().toString(36).slice(2);
   const appUrl = (fw === 'react' ? 'react/index.html' : 'solid/index.html') + cacheBust;
 
-  // =====================================================
-  // PHASE 1: LOAD METRICS
-  // =====================================================
+  // ==== PHASE 1: COLD LOAD ====
   const loadStart = performance.now();
   setStatus('Loading app (cache-busted)...');
-  setProgress(5);
+  setProgress(3);
   frame.src = appUrl;
 
   await waitForLoad(frame);
@@ -271,92 +249,95 @@ async function startBenchmark() {
   results['Full Load'] = +load.fullLoad.toFixed(2);
   if (load.transferSize != null) results['Transfer Size (KB)'] = +(load.transferSize / 1024).toFixed(1);
 
+  // Cache detection
+  const cacheStatus = detectCacheStatus(frame);
+  if (typeof cacheStatus === 'object') {
+    cacheInfo.resources_total = cacheStatus.total;
+    cacheInfo.resources_cached = cacheStatus.cached;
+    cacheInfo.resources_network = cacheStatus.network;
+    const pct = cacheStatus.total ? Math.round(cacheStatus.cached / cacheStatus.total * 100) : 0;
+    cacheBadge.textContent = `${pct}% cached (${cacheStatus.cached}/${cacheStatus.total})`;
+    cacheBadge.className = pct > 50 ? 'cache-warm' : 'cache-cold';
+    results['Resources from Cache'] = cacheStatus.cached;
+    results['Resources from Network'] = cacheStatus.network;
+  } else {
+    cacheBadge.textContent = cacheStatus === 'warm' ? 'CACHED' : 'COLD';
+    cacheBadge.className = cacheStatus === 'warm' ? 'cache-warm' : 'cache-cold';
+  }
+
   const mem0 = getMemory(frame);
   if (mem0) results['JS Heap Baseline (MB)'] = mem0.usedMB;
 
-  setProgress(10);
-  setStatus('Loaded. Settling...');
+  setProgress(8);
+  setStatus('Settling...');
   await sleep(2000);
-  setProgress(15);
 
   const doc = () => frame.contentWindow.document;
   const win = () => frame.contentWindow;
 
-  // =====================================================
-  // PHASE 2: BASIC INTERACTIONS
-  // =====================================================
-
-  // 1. Open App Menu
-  setStatus('Opening app menu...');
-  const t1 = await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
-  if (t1 != null) results['Open App Menu'] = +t1.toFixed(2);
-  await sleep(400);
-  setProgress(18);
-
-  // 2. Category switch
-  setStatus('Switching category...');
-  const t2 = await clickAndMeasure(frame, '.kasm-app-menu__category:nth-child(3)', null);
-  if (t2 != null) results['Category Switch'] = +t2.toFixed(2);
-  await sleep(300);
-  setProgress(21);
-
-  // 3. Launch Terminal
+  // ==== PHASE 2: LAUNCH TERMINAL & INTERACT ====
   setStatus('Launching Terminal...');
-  const t3 = await clickAndMeasure(frame, null, '\u2B1B');
-  if (t3 != null) results['Launch Terminal'] = +t3.toFixed(2);
-  await sleep(600);
+  const tTerminal = await launchApp('Terminal');
+  if (tTerminal != null) results['Launch Terminal'] = +tTerminal.toFixed(2);
+  await sleep(400);
+  setProgress(12);
+
+  // Maximize the terminal window
+  setStatus('Maximizing Terminal...');
+  {
+    const maxBtn = doc().querySelector('.kasm-titlebar__btn--maximize');
+    if (maxBtn) {
+      const t = await measureInteraction(frame, (w) => {
+        maxBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+      results['Maximize Window'] = +t.toFixed(2);
+    }
+  }
+  await sleep(300);
+
+  // Restore from maximize
+  {
+    const maxBtn = doc().querySelector('.kasm-titlebar__btn--maximize');
+    if (maxBtn) {
+      const t = await measureInteraction(frame, (w) => {
+        maxBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+      results['Restore from Maximize'] = +t.toFixed(2);
+    }
+  }
+  await sleep(200);
+  setProgress(15);
+
+  // ==== PHASE 3: WINDOW DRAG (60 frames) ====
+  setStatus('Dragging window (60 frames)...');
+  {
+    const tb = doc().querySelector('.kasm-titlebar');
+    const t = await dragAndMeasure(frame, tb, 300, 150, 60);
+    if (t != null) results['Window Drag (avg/frame)'] = +t.toFixed(2);
+  }
+  await sleep(200);
+  setProgress(20);
+
+  // ==== PHASE 4: WINDOW RESIZE (60 frames via SE handle) ====
+  setStatus('Resizing window SE corner (60 frames)...');
+  {
+    const handle = doc().querySelector('.kasm-window__resize--se');
+    const t = await dragAndMeasure(frame, handle, 200, 150, 60);
+    if (t != null) results['Window Resize SE (avg/frame)'] = +t.toFixed(2);
+  }
+  await sleep(200);
   setProgress(25);
 
-  // 4. Typing in terminal
-  setStatus('Typing in terminal...');
-  const t4 = await typeAndMeasure(frame,
-    '.kasm-terminal__input, .kasm-terminal input, input[type="text"]',
-    'ls -la /home/user'
-  );
-  if (t4 != null) results['Keystroke Latency (avg)'] = +t4.toFixed(2);
-  await sleep(300);
-  setProgress(28);
-
-  // =====================================================
-  // PHASE 3: WINDOW DRAG (continuous position updates)
-  // This stresses the reactivity system — every mousemove
-  // triggers x/y signal updates → style recalc on the window
-  // =====================================================
-  setStatus('Dragging window (60 frames)...');
-  const titlebar = doc().querySelector('.kasm-titlebar');
-  const t5 = await dragAndMeasure(frame, titlebar, 300, 150, 60);
-  if (t5 != null) results['Window Drag (avg/frame)'] = +t5.toFixed(2);
-  await sleep(300);
-  setProgress(34);
-
-  // =====================================================
-  // PHASE 4: WINDOW RESIZE (SE corner drag)
-  // Triggers width+height signal updates + content reflow
-  // =====================================================
-  setStatus('Resizing window (60 frames)...');
-  const resizeSE = doc().querySelector('.kasm-window__resize--se');
-  const t6 = await dragAndMeasure(frame, resizeSE, 200, 150, 60);
-  if (t6 != null) results['Window Resize SE (avg/frame)'] = +t6.toFixed(2);
-  await sleep(300);
-  setProgress(40);
-
-  // =====================================================
-  // PHASE 5: WINDOW SNAP TO HALF-SCREEN
-  // Drag to edge → snap preview appears → drop → window
-  // snaps to half-screen. Tests snap zone detection +
-  // animated resize to target geometry.
-  // =====================================================
+  // ==== PHASE 5: SNAP TO LEFT EDGE ====
   setStatus('Snap window to left edge...');
   {
     const tb = doc().querySelector('.kasm-titlebar');
     if (tb) {
       const rect = tb.getBoundingClientRect();
-      const sx = rect.left + rect.width / 2;
-      const sy = rect.top + rect.height / 2;
-      // Drag all the way to x=2 (left edge snap zone = 8px threshold)
+      const sx = rect.left + rect.width / 2, sy = rect.top + rect.height / 2;
       const targetX = 2;
       const steps = 40;
-      const dx = targetX - sx;
+      const ddx = targetX - sx;
       const w = win();
       const times = [];
 
@@ -364,254 +345,270 @@ async function startBenchmark() {
       for (let i = 1; i <= steps; i++) {
         const t0 = w.performance.now();
         w.document.dispatchEvent(new w.MouseEvent('mousemove', {
-          clientX: sx + (dx * i / steps), clientY: sy, bubbles: true
+          clientX: sx + (ddx * i / steps), clientY: sy, bubbles: true
         }));
         await new Promise(r => w.requestAnimationFrame(r));
         times.push(w.performance.now() - t0);
       }
-      // Drop at edge — triggers snap
       const snapT0 = w.performance.now();
-      w.document.dispatchEvent(new w.MouseEvent('mouseup', {
-        clientX: targetX, clientY: sy, bubbles: true
-      }));
+      w.document.dispatchEvent(new w.MouseEvent('mouseup', { clientX: targetX, clientY: sy, bubbles: true }));
       await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
       const snapTime = w.performance.now() - snapT0;
 
-      if (times.length) results['Snap Drag to Edge (avg/frame)'] = +(times.reduce((a,b)=>a+b,0) / times.length).toFixed(2);
+      if (times.length) results['Snap Drag to Edge (avg/frame)'] = +(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2);
       results['Snap Commit'] = +snapTime.toFixed(2);
     }
   }
-  await sleep(500);
-  setProgress(47);
+  await sleep(400);
 
-  // Restore from snap (double-click titlebar = toggle maximize/restore)
-  setStatus('Restore from snap...');
+  // Restore via double-click
   {
     const tb = doc().querySelector('.kasm-titlebar');
     if (tb) {
-      const tRestore = await measureInteraction(frame, (w) => {
+      const t = await measureInteraction(frame, (w) => {
         tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true }));
       });
-      results['Snap Restore (dblclick)'] = +tRestore.toFixed(2);
-    }
-  }
-  await sleep(300);
-
-  // Un-maximize back to floating
-  {
-    const tb = doc().querySelector('.kasm-titlebar');
-    if (tb) {
+      results['Snap Restore (dblclick)'] = +t.toFixed(2);
+      await sleep(200);
+      // Toggle back to floating
       await measureInteraction(frame, (w) => {
         tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true }));
       });
     }
   }
-  await sleep(300);
-  setProgress(50);
+  await sleep(200);
+  setProgress(30);
 
-  // =====================================================
-  // PHASE 6: OPEN MULTIPLE WINDOWS + RAPID FOCUS SWITCHING
-  // Opens 3 more windows, then cycles focus across all of
-  // them. Each focus switch triggers z-index reorder +
-  // focused/unfocused class updates on every window.
-  // =====================================================
-  setStatus('Opening multiple windows...');
-
-  // Launch 3 more apps via app menu
-  const appsToLaunch = ['\uD83D\uDD22', '\uD83D\uDCC1', '\u2699\uFE0F']; // Calculator, Files, Settings
-  for (const icon of appsToLaunch) {
-    await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
-    await sleep(300);
-    await clickAndMeasure(frame, null, icon);
-    await sleep(400);
+  // ==== PHASE 6: MASS WINDOW CREATION (15 windows) ====
+  // Launch a mix of different apps to create 15 windows total.
+  // This is the core stress test: each new window means the
+  // window manager must track, z-order, and render more DOM.
+  setStatus('Opening 15 windows...');
+  const appNames = [
+    'Calculator', 'File Manager', 'Text Editor', 'Notes', 'System Monitor',
+    'Docking Demo', 'Codex', 'Claude Code', 'GitHub', 'GitLab',
+    'Gemini Code', 'Cursor Agent', 'Devin', 'Junie',
+  ];
+  const launchTimes = [];
+  for (let i = 0; i < appNames.length; i++) {
+    setStatus(`Opening ${appNames[i]} (${i + 2}/15)...`);
+    const t = await launchApp(appNames[i]);
+    if (t != null) launchTimes.push(t);
+    setProgress(30 + Math.round((i / appNames.length) * 15));
   }
-  setProgress(55);
+  if (launchTimes.length) {
+    results['App Launch (avg, 15 wins)'] = +(launchTimes.reduce((a,b)=>a+b,0)/launchTimes.length).toFixed(2);
+    results['App Launch (last of 15)'] = +launchTimes[launchTimes.length - 1].toFixed(2);
+  }
 
-  // Rapid focus switching: click each window's titlebar
-  setStatus('Rapid window focus cycling...');
+  const mem1 = getMemory(frame);
+  if (mem1) results['JS Heap (15 windows, MB)'] = mem1.usedMB;
+  setProgress(45);
+
+  // ==== PHASE 7: RAPID FOCUS CYCLING (15 windows x 2 rounds) ====
+  setStatus('Focus cycling across 15 windows...');
   {
-    const windows = doc().querySelectorAll('.kasm-window');
+    const allWins = doc().querySelectorAll('.kasm-window');
     const focusTimes = [];
-    // Cycle through all windows 3 times
-    for (let round = 0; round < 3; round++) {
-      for (const w of windows) {
-        const tb = w.querySelector('.kasm-titlebar');
+    for (let round = 0; round < 2; round++) {
+      for (const wEl of allWins) {
+        const tb = wEl.querySelector('.kasm-titlebar');
         if (!tb) continue;
-        const t = await measureInteraction(frame, (iwin) => {
-          tb.dispatchEvent(new iwin.MouseEvent('mousedown', { bubbles: true }));
-          tb.dispatchEvent(new iwin.MouseEvent('mouseup', { bubbles: true }));
+        const t = await measureInteraction(frame, (w) => {
+          tb.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true }));
+          tb.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
         });
         focusTimes.push(t);
       }
     }
-    if (focusTimes.length) results['Focus Switch (avg)'] = +(focusTimes.reduce((a,b)=>a+b,0) / focusTimes.length).toFixed(2);
+    if (focusTimes.length) results['Focus Switch (avg, 15 wins)'] = +(focusTimes.reduce((a,b)=>a+b,0)/focusTimes.length).toFixed(2);
   }
-  await sleep(300);
-  setProgress(60);
+  setProgress(52);
 
-  // =====================================================
-  // PHASE 7: MINIMIZE + RESTORE
-  // Minimize all, then restore — stresses list diffing
-  // (window list in panel updates for each min/restore)
-  // =====================================================
-  setStatus('Minimize/restore all windows...');
+  // ==== PHASE 8: DRAG A WINDOW WITH 14 OTHERS BEHIND IT ====
+  setStatus('Dragging window over 14 others (80 frames)...');
+  {
+    const tb = doc().querySelector('.kasm-window--focused .kasm-titlebar');
+    const t = await dragAndMeasure(frame, tb, 400, 200, 80);
+    if (t != null) results['Drag over 14 windows (avg/frame)'] = +t.toFixed(2);
+  }
+  await sleep(200);
+  setProgress(57);
+
+  // ==== PHASE 9: RESIZE WITH 14 WINDOWS BEHIND ====
+  setStatus('Resizing window with 14 behind (60 frames)...');
+  {
+    const handle = doc().querySelector('.kasm-window--focused .kasm-window__resize--se');
+    const t = await dragAndMeasure(frame, handle, 150, 100, 60);
+    if (t != null) results['Resize over 14 windows (avg/frame)'] = +t.toFixed(2);
+  }
+  await sleep(200);
+  setProgress(62);
+
+  // ==== PHASE 10: MINIMIZE ALL 15 WINDOWS ====
+  setStatus('Minimizing all 15 windows...');
   {
     const minTimes = [];
-    const restoreTimes = [];
-
-    // Minimize all
-    let minBtns = doc().querySelectorAll('.kasm-titlebar__btn--minimize');
-    for (const btn of minBtns) {
+    let btn;
+    while ((btn = doc().querySelector('.kasm-titlebar__btn--minimize'))) {
       const t = await measureInteraction(frame, (w) => {
         btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
       });
       minTimes.push(t);
-      await sleep(100);
+      await sleep(50);
     }
+    if (minTimes.length) {
+      results['Minimize (avg, 15 wins)'] = +(minTimes.reduce((a,b)=>a+b,0)/minTimes.length).toFixed(2);
+      results['Minimize (last of 15)'] = +minTimes[minTimes.length - 1].toFixed(2);
+    }
+  }
+  setProgress(68);
 
-    // Restore all by clicking panel buttons
-    await sleep(300);
-    let panelBtns = doc().querySelectorAll('.kasm-panel-btn');
+  // ==== PHASE 11: RESTORE ALL FROM PANEL ====
+  setStatus('Restoring all from panel...');
+  {
+    const restoreTimes = [];
+    // Panel buttons in center zone are window list buttons
+    const panelBtns = doc().querySelectorAll('.kasm-panel__zone--center .kasm-panel-btn');
     for (const btn of panelBtns) {
       const t = await measureInteraction(frame, (w) => {
         btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
       });
       restoreTimes.push(t);
-      await sleep(100);
+      await sleep(50);
     }
-
-    if (minTimes.length) results['Minimize Window (avg)'] = +(minTimes.reduce((a,b)=>a+b,0) / minTimes.length).toFixed(2);
-    if (restoreTimes.length) results['Restore from Panel (avg)'] = +(restoreTimes.reduce((a,b)=>a+b,0) / restoreTimes.length).toFixed(2);
+    if (restoreTimes.length) results['Restore from Panel (avg, 15 wins)'] = +(restoreTimes.reduce((a,b)=>a+b,0)/restoreTimes.length).toFixed(2);
   }
   await sleep(300);
-  setProgress(66);
+  setProgress(73);
 
-  // =====================================================
-  // PHASE 8: SPLIT PANE RESIZE
-  // If any split pane exists, drag its splitter. This
-  // triggers continuous flex-basis recalc on both panes.
-  // =====================================================
-  setStatus('Resizing split pane...');
+  // ==== PHASE 12: EXPO VIEW (with 15 windows) ====
+  setStatus('Expo view with 15 windows...');
+  {
+    const tOpen = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'ArrowUp', code: 'ArrowUp', ctrlKey: true, altKey: true, bubbles: true
+      }));
+    });
+    results['Expo Open (15 wins)'] = +tOpen.toFixed(2);
+    await sleep(600);
+
+    const tClose = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'Escape', code: 'Escape', bubbles: true
+      }));
+    });
+    results['Expo Close (15 wins)'] = +tClose.toFixed(2);
+  }
+  await sleep(300);
+
+  // Scale view
+  {
+    const tOpen = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'ArrowDown', code: 'ArrowDown', ctrlKey: true, altKey: true, bubbles: true
+      }));
+    });
+    results['Scale Open (15 wins)'] = +tOpen.toFixed(2);
+    await sleep(600);
+
+    const tClose = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'Escape', code: 'Escape', bubbles: true
+      }));
+    });
+    results['Scale Close (15 wins)'] = +tClose.toFixed(2);
+  }
+  await sleep(300);
+  setProgress(78);
+
+  // ==== PHASE 13: SPLIT PANE RESIZE ====
+  setStatus('Split pane resize (50 frames)...');
   {
     const splitter = doc().querySelector('.kasm-split-pane__splitter');
     const t = await dragAndMeasure(frame, splitter, 150, 0, 50);
     if (t != null) results['Split Pane Resize (avg/frame)'] = +t.toFixed(2);
   }
-  await sleep(300);
-  setProgress(72);
+  await sleep(200);
+  setProgress(82);
 
-  // =====================================================
-  // PHASE 9: TAB REORDER (HTML5 DnD)
-  // Drag the first tab to the last tab position. Both React
-  // and Solid re-render the entire tab bar; Solid should
-  // only update the moved nodes.
-  // =====================================================
-  setStatus('Reordering tabs via drag-and-drop...');
+  // ==== PHASE 14: TAB REORDER ====
+  setStatus('Tab reorder DnD...');
   {
     const tabs = doc().querySelectorAll('.kasm-tab-panel__tab');
     if (tabs.length >= 2) {
-      const srcTab = tabs[0];
-      const destTab = tabs[tabs.length - 1];
-      const t = await dndAndMeasure(frame, srcTab, destTab, {
-        'text/plain': '0',
-      });
-      if (t != null) results['Tab Reorder DnD'] = +t.toFixed(2);
+      const src = tabs[0], dest = tabs[tabs.length - 1];
+      const w = win();
+      const srcR = src.getBoundingClientRect(), destR = dest.getBoundingClientRect();
+
+      const data = {};
+      const dt = {
+        types: [], dropEffect: 'none', effectAllowed: 'move',
+        setData(k, v) { data[k] = v; this.types.push(k); },
+        getData(k) { return data[k] || ''; },
+        setDragImage() {},
+      };
+
+      const t0 = w.performance.now();
+      src.dispatchEvent(new w.DragEvent('dragstart', {
+        clientX: srcR.left + srcR.width/2, clientY: srcR.top + srcR.height/2,
+        bubbles: true, dataTransfer: dt,
+      }));
+      dest.dispatchEvent(new w.DragEvent('dragenter', {
+        clientX: destR.left + destR.width/2, clientY: destR.top + destR.height/2,
+        bubbles: true, dataTransfer: dt,
+      }));
+      dest.dispatchEvent(new w.DragEvent('dragover', {
+        clientX: destR.left + destR.width/2, clientY: destR.top + destR.height/2,
+        bubbles: true, cancelable: true, dataTransfer: dt,
+      }));
+      dest.dispatchEvent(new w.DragEvent('drop', {
+        clientX: destR.left + destR.width/2, clientY: destR.top + destR.height/2,
+        bubbles: true, dataTransfer: dt,
+      }));
+      src.dispatchEvent(new w.DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+      await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
+      results['Tab Reorder DnD'] = +(w.performance.now() - t0).toFixed(2);
     }
   }
-  await sleep(300);
-  setProgress(78);
+  await sleep(200);
+  setProgress(86);
 
-  // =====================================================
-  // PHASE 10: EXPO / SCALE VIEW
-  // Ctrl+Alt+Up toggles Expo (workspace overview with
-  // mini-windows rendered for each workspace).
-  // This creates a full-screen overlay + scales all windows.
-  // =====================================================
-  setStatus('Toggle Expo view...');
-  {
-    const w = win();
-    const tOpen = await measureInteraction(frame, (w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
-        key: 'ArrowUp', code: 'ArrowUp',
-        ctrlKey: true, altKey: true, bubbles: true
-      }));
-    });
-    results['Expo View Open'] = +tOpen.toFixed(2);
-    await sleep(600);
-
-    // Close expo
-    const tClose = await measureInteraction(frame, (w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
-        key: 'Escape', code: 'Escape', bubbles: true
-      }));
-    });
-    results['Expo View Close'] = +tClose.toFixed(2);
-  }
-  await sleep(300);
-  setProgress(83);
-
-  // Scale view (Ctrl+Alt+Down) — similar but shows individual windows
-  setStatus('Toggle Scale view...');
-  {
-    const tOpen = await measureInteraction(frame, (w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
-        key: 'ArrowDown', code: 'ArrowDown',
-        ctrlKey: true, altKey: true, bubbles: true
-      }));
-    });
-    results['Scale View Open'] = +tOpen.toFixed(2);
-    await sleep(600);
-
-    const tClose = await measureInteraction(frame, (w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
-        key: 'Escape', code: 'Escape', bubbles: true
-      }));
-    });
-    results['Scale View Close'] = +tClose.toFixed(2);
-  }
-  await sleep(300);
-  setProgress(88);
-
-  // =====================================================
-  // PHASE 11: CLOSE ALL WINDOWS (batch DOM removal)
-  // Close each window — tests how efficiently the framework
-  // removes components and cleans up event listeners
-  // =====================================================
-  setStatus('Closing all windows...');
+  // ==== PHASE 15: CLOSE ALL 15 WINDOWS ====
+  setStatus('Closing all 15 windows...');
   {
     const closeTimes = [];
-    let closeBtn;
-    while ((closeBtn = doc().querySelector('.kasm-titlebar__btn--close'))) {
+    let btn;
+    while ((btn = doc().querySelector('.kasm-titlebar__btn--close'))) {
       const t = await measureInteraction(frame, (w) => {
-        closeBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+        btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
       });
       closeTimes.push(t);
-      await sleep(150);
+      await sleep(50);
     }
-    if (closeTimes.length) results['Close Window (avg)'] = +(closeTimes.reduce((a,b)=>a+b,0) / closeTimes.length).toFixed(2);
+    if (closeTimes.length) {
+      results['Close Window (avg, 15 wins)'] = +(closeTimes.reduce((a,b)=>a+b,0)/closeTimes.length).toFixed(2);
+      results['Close Window (last of 15)'] = +closeTimes[closeTimes.length - 1].toFixed(2);
+    }
   }
   setProgress(95);
 
-  // =====================================================
-  // PHASE 12: MEMORY
-  // =====================================================
-  const mem1 = getMemory(frame);
-  if (mem1) results['JS Heap After (MB)'] = mem1.usedMB;
+  // ==== PHASE 16: FINAL MEMORY ====
+  const memFinal = getMemory(frame);
+  if (memFinal) results['JS Heap After Cleanup (MB)'] = memFinal.usedMB;
 
-  // =====================================================
-  // STORE & REDIRECT
-  // =====================================================
+  // ==== STORE & REDIRECT ====
   localStorage.setItem('bench_' + fw, JSON.stringify({
     framework: fw,
     timestamp: Date.now(),
     userAgent: navigator.userAgent,
+    cacheInfo,
     results,
   }));
 
   setProgress(100);
   setStatus('Done! Redirecting...');
   await sleep(500);
-
   location.href = returnTo;
 }
 </script>

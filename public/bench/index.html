@@ -223,22 +223,47 @@ function renderResults() {
   const allKeys = [...new Set([...Object.keys(rr), ...Object.keys(sr)])];
 
   // Categorize metrics
-  const loadKeys = ['Cold Load (wall clock)', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)', 'JS Heap Baseline (MB)'];
-  const wmKeys = ['Window Drag (avg/frame)', 'Window Resize SE (avg/frame)', 'Snap Drag to Edge (avg/frame)', 'Snap Commit', 'Snap Restore (dblclick)', 'Focus Switch (avg)', 'Minimize Window (avg)', 'Restore from Panel (avg)', 'Close Window (avg)'];
-  const layoutKeys = ['Split Pane Resize (avg/frame)', 'Tab Reorder DnD', 'Expo View Open', 'Expo View Close', 'Scale View Open', 'Scale View Close'];
-  const basicKeys = ['Open App Menu', 'Category Switch', 'Launch Terminal', 'Keystroke Latency (avg)'];
+  const loadKeys = ['Cold Load (wall clock)', 'DOM Interactive', 'DOM Content Loaded', 'First Paint', 'First Contentful Paint', 'Full Load', 'Transfer Size (KB)'];
+  const stressKeys = ['App Launch (avg, 15 wins)', 'App Launch (last of 15)', 'Focus Switch (avg, 15 wins)', 'Drag over 14 windows (avg/frame)', 'Resize over 14 windows (avg/frame)', 'Minimize (avg, 15 wins)', 'Minimize (last of 15)', 'Restore from Panel (avg, 15 wins)', 'Close Window (avg, 15 wins)', 'Close Window (last of 15)'];
+  const wmKeys = ['Launch Terminal', 'Maximize Window', 'Restore from Maximize', 'Window Drag (avg/frame)', 'Window Resize SE (avg/frame)', 'Snap Drag to Edge (avg/frame)', 'Snap Commit', 'Snap Restore (dblclick)'];
+  const layoutKeys = ['Split Pane Resize (avg/frame)', 'Tab Reorder DnD', 'Expo Open (15 wins)', 'Expo Close (15 wins)', 'Scale Open (15 wins)', 'Scale Close (15 wins)'];
+  const cacheKeys = ['Resources from Cache', 'Resources from Network'];
   const memKeys = allKeys.filter(k => k.includes('Heap'));
-  const categorized = new Set([...loadKeys, ...wmKeys, ...layoutKeys, ...basicKeys, ...memKeys]);
+  const categorized = new Set([...loadKeys, ...stressKeys, ...wmKeys, ...layoutKeys, ...cacheKeys, ...memKeys]);
   const otherKeys = allKeys.filter(k => !categorized.has(k));
 
   let html = '';
 
+  // Cache status banner
+  const rCache = react.cacheInfo || {};
+  const sCache = solid.cacheInfo || {};
+  if (rCache.resources_total || sCache.resources_total) {
+    html += '<div style="display:flex;gap:1rem;margin-bottom:1rem;">';
+    if (rCache.resources_total) {
+      const pct = Math.round((rCache.resources_cached || 0) / rCache.resources_total * 100);
+      html += `<div style="flex:1;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;">
+        <span style="color:var(--react);font-weight:700;">React</span>: ${rCache.resources_network}/${rCache.resources_total} from network
+        <span style="color:${pct > 50 ? 'var(--yellow,#d29922)' : 'var(--green)'};font-weight:600;">(${pct}% cached)</span>
+      </div>`;
+    }
+    if (sCache.resources_total) {
+      const pct = Math.round((sCache.resources_cached || 0) / sCache.resources_total * 100);
+      html += `<div style="flex:1;padding:0.6rem 1rem;background:var(--surface);border:1px solid var(--border);border-radius:6px;font-size:0.8rem;">
+        <span style="color:var(--solid);font-weight:700;">SolidJS</span>: ${sCache.resources_network}/${sCache.resources_total} from network
+        <span style="color:${pct > 50 ? 'var(--yellow,#d29922)' : 'var(--green)'};font-weight:600;">(${pct}% cached)</span>
+      </div>`;
+    }
+    html += '</div>';
+  }
+
   // Summary bar chart
   html += '<h3 class="section-title">Visual Comparison</h3>';
   html += '<div class="bar-chart">';
-  for (const key of allKeys) {
+  // Only show timing metrics in bar chart (skip cache/resource counts)
+  const barKeys = allKeys.filter(k => !cacheKeys.includes(k) && typeof rr[k] === 'number' && typeof sr[k] === 'number');
+  for (const key of barKeys) {
     const rv = rr[key], sv = sr[key];
-    if (rv == null || sv == null || typeof rv !== 'number' || typeof sv !== 'number') continue;
+    if (rv == null || sv == null) continue;
     const max = Math.max(rv, sv) || 1;
     const rPct = (rv / max * 100).toFixed(1);
     const sPct = (sv / max * 100).toFixed(1);
@@ -263,9 +288,9 @@ function renderResults() {
 
   // Tables by category
   html += renderTable('Load Performance', loadKeys, rr, sr);
+  html += renderTable('15-Window Stress Test', stressKeys, rr, sr);
   html += renderTable('Window Management', wmKeys, rr, sr);
   html += renderTable('Layout & Views', layoutKeys, rr, sr);
-  html += renderTable('Basic Interactions', basicKeys, rr, sr);
   if (otherKeys.length) html += renderTable('Other', otherKeys, rr, sr);
   if (memKeys.length) html += renderTable('Memory', memKeys, rr, sr);
 
