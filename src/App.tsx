@@ -22,10 +22,10 @@ import { appRegistry } from './apps/registry';
 import { vfs } from './apps/vfs';
 import './styles/global.css';
 
-function spawn100Windows() {
+function spawnWindows(count: number) {
   const apps = appRegistry.filter(a => !a.singleton);
   const cols = 10;
-  for (let i = 0; i < 100; i++) {
+  for (let i = 0; i < count; i++) {
     const app = apps[i % apps.length];
     const col = i % cols;
     const row = Math.floor(i / cols);
@@ -54,8 +54,10 @@ export default function App() {
     document.documentElement.style.setProperty('--kasm-panel-h', `${desktop.panelConfig.height}px`);
   });
 
-  // Spawn 100 windows on startup
-  spawn100Windows();
+  // Spawn N windows on startup via ?spawn=N (default 100)
+  const spawnParam = new URLSearchParams(window.location.search).get('spawn');
+  const spawnCount = spawnParam === null ? 100 : parseInt(spawnParam, 10);
+  if (spawnCount > 0) spawnWindows(spawnCount);
 
   // Welcome notification on first load
   const timer1 = setTimeout(() => {

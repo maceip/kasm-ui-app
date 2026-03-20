@@ -59,8 +59,11 @@ function stopServer() {
 }
 
 async function launchBrowser() {
+  const executablePath = process.env.PUPPETEER_EXECUTABLE_PATH
+    || (() => { try { return require('fs').existsSync('/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome') ? '/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome' : undefined; } catch { return undefined; } })();
   browser = await puppeteer.launch({
     headless: true,
+    ...(executablePath ? { executablePath } : {}),
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -86,7 +89,7 @@ async function newPage() {
 }
 
 async function openApp(page) {
-  await page.goto(BASE_URL, { waitUntil: 'networkidle0', timeout: 10000 });
+  await page.goto(`${BASE_URL}?spawn=0`, { waitUntil: 'load', timeout: 30000 });
   // Wait for the desktop to render
   await page.waitForSelector('.kasm-desktop', { timeout: 5000 });
   // Dismiss welcome notification by waiting a moment
