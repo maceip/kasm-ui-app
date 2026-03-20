@@ -17,6 +17,7 @@
   user-select: none;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
+  touch-action: manipulation; /* prevent double-tap zoom */
 }
 
 .kasm-panel--bottom {

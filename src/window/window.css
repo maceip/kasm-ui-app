@@ -49,6 +49,7 @@
   cursor: grab;
   flex-shrink: 0;
   border-bottom: 1px solid var(--kasm-window-border);
+  touch-action: none; /* prevent browser gestures during drag */
 }
 
 .kasm-titlebar--focused {
@@ -115,6 +116,7 @@
 .kasm-window__resize {
   position: absolute;
   z-index: 1;
+  touch-action: none; /* prevent browser gestures during resize */
 }
 
 .kasm-window__resize--n {
