@@ -1,23 +1,15 @@
 // ============================================================
 // SolidJS Store - Composed from domain slices
-// Uses solid-js/store createStore with draft-based mutations.
+// Uses solid-js/store with GRANULAR path-based updates.
+// Every mutation targets the specific property that changed,
+// so only DOM nodes reading that property re-render.
 // ============================================================
 
 import { createStore } from 'solid-js/store';
 import { v4 as uuid } from 'uuid';
 import type { WindowState, AppDefinition, SnapZone, Workspace, PanelConfig, Notification, Project, AgentSession, AgentTask, AgentBackend, GitNode, PanelPosition } from './types';
 import { PANEL_HEIGHT_DEFAULT } from './types';
-import {
-  CASCADE_OFFSET,
-  applyFocusWindow,
-  applyMoveWindow,
-  applyResizeWindow,
-  applySnapWindow,
-  applyMinimizeWindow,
-  applyMaximizeWindow,
-  applyRestoreWindow,
-  applyUpdateWindowTitle,
-} from '../lib/windowActions';
+import { CASCADE_OFFSET, getSnapBounds } from '../lib/windowActions';
 
 // ---- Hot Corner Types ----
 export type HotCornerAction = 'expo' | 'scale' | 'show-desktop' | 'none';
@@ -118,7 +110,14 @@ const [state, setState] = createStore<DesktopStoreState>({
 // ---- Exported Reactive State (read-only proxy) ----
 export const desktop = state;
 
-// ---- Window Actions ----
+// ---- Helpers ----
+/** Find window index by id. Returns -1 if not found. */
+function winIdx(id: string): number {
+  return state.windows.findIndex(w => w.id === id);
+}
+
+// ---- Window Actions (granular path-based updates) ----
+
 export function createWindow(app: AppDefinition, overrides?: Partial<WindowState>): string {
   // Enforce singleton
   if (app.singleton) {
@@ -133,6 +132,13 @@ export function createWindow(app: AppDefinition, overrides?: Partial<WindowState
   const z = state.nextZIndex;
   const ci = state.cascadeIndex;
   const offset = (ci % 10) * CASCADE_OFFSET;
+
+  // Defocus all existing windows (granular per-window update)
+  for (let i = 0; i < state.windows.length; i++) {
+    if (state.windows[i].focused) {
+      setState('windows', i, 'focused', false);
+    }
+  }
 
   const win: WindowState = {
     id,
@@ -155,7 +161,8 @@ export function createWindow(app: AppDefinition, overrides?: Partial<WindowState
     ...overrides,
   };
 
-  setState('windows', w => [...w.map(ww => ({ ...ww, focused: false })), win]);
+  // Append to array (structural change — only triggers array-level subscribers)
+  setState('windows', prev => [...prev, win]);
   setState('nextZIndex', z + 1);
   setState('cascadeIndex', ci + 1);
   // Add to active workspace
@@ -167,6 +174,7 @@ export function createWindow(app: AppDefinition, overrides?: Partial<WindowState
 }
 
 export function closeWindow(id: string): void {
+  // Array filter is correct for removal — it's a structural change
   setState('windows', w => w.filter(ww => ww.id !== id));
   // Remove from all workspaces
   for (let i = 0; i < state.workspaces.length; i++) {
@@ -177,38 +185,89 @@ export function closeWindow(id: string): void {
 }
 
 export function focusWindow(id: string): void {
+  const idx = winIdx(id);
+  if (idx < 0) return;
   const z = state.nextZIndex;
-  setState('windows', applyFocusWindow(state.windows as WindowState[], id, z));
+  // Defocus only the currently focused window (not all N windows)
+  for (let i = 0; i < state.windows.length; i++) {
+    if (state.windows[i].focused && i !== idx) {
+      setState('windows', i, 'focused', false);
+    }
+  }
+  // Focus the target — only sets properties that actually change
+  setState('windows', idx, 'focused', true);
+  setState('windows', idx, 'zIndex', z);
+  if (state.windows[idx].state === 'minimized') {
+    setState('windows', idx, 'state', 'normal');
+  }
   setState('nextZIndex', z + 1);
 }
 
 export function minimizeWindow(id: string): void {
-  setState('windows', applyMinimizeWindow(state.windows as WindowState[], id));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  setState('windows', idx, 'state', 'minimized');
+  setState('windows', idx, 'focused', false);
 }
 
 export function maximizeWindow(id: string): void {
-  setState('windows', applyMaximizeWindow(state.windows as WindowState[], id, DESKTOP_WIDTH(), DESKTOP_HEIGHT()));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  const bounds = getSnapBounds('maximize', DESKTOP_WIDTH(), DESKTOP_HEIGHT());
+  setState('windows', idx, {
+    state: 'maximized' as const,
+    x: bounds.x, y: bounds.y,
+    width: bounds.width, height: bounds.height,
+  });
 }
 
 export function restoreWindow(id: string): void {
-  setState('windows', applyRestoreWindow(state.windows as WindowState[], id));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  setState('windows', idx, 'state', 'normal');
 }
 
 export function snapWindow(id: string, zone: SnapZone | null): void {
   if (!zone) return;
-  setState('windows', applySnapWindow(state.windows as WindowState[], id, zone, DESKTOP_WIDTH(), DESKTOP_HEIGHT()));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  const bounds = getSnapBounds(zone, DESKTOP_WIDTH(), DESKTOP_HEIGHT());
+  const snapState = zone === 'maximize'
+    ? 'maximized' as const
+    : `snapped-${zone}` as WindowState['state'];
+  setState('windows', idx, {
+    state: snapState,
+    x: bounds.x, y: bounds.y,
+    width: bounds.width, height: bounds.height,
+  });
 }
 
+/** HOT PATH — called on every mousemove during drag (~60x/sec) */
 export function moveWindow(id: string, x: number, y: number): void {
-  setState('windows', applyMoveWindow(state.windows as WindowState[], id, x, y));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  // Only update the two properties that changed — subscribers to
+  // other properties (focused, title, etc.) are NOT notified.
+  setState('windows', idx, 'x', x);
+  setState('windows', idx, 'y', y);
+  if (state.windows[idx].state !== 'normal') {
+    setState('windows', idx, 'state', 'normal');
+  }
 }
 
+/** HOT PATH — called on every mousemove during resize (~60x/sec) */
 export function resizeWindow(id: string, width: number, height: number): void {
-  setState('windows', applyResizeWindow(state.windows as WindowState[], id, width, height));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  const w = state.windows[idx];
+  setState('windows', idx, 'width', Math.max(w.minWidth, Math.min(width, w.maxWidth ?? Infinity)));
+  setState('windows', idx, 'height', Math.max(w.minHeight, Math.min(height, w.maxHeight ?? Infinity)));
 }
 
 export function updateWindowTitle(id: string, title: string): void {
-  setState('windows', applyUpdateWindowTitle(state.windows as WindowState[], id, title));
+  const idx = winIdx(id);
+  if (idx < 0) return;
+  setState('windows', idx, 'title', title);
 }
 
 // ---- Workspace Actions ----
@@ -272,22 +331,27 @@ export function toggleAgentSidebar(): void {
 export function showDesktop(): void {
   const activeWs = state.workspaces.find(ws => ws.id === state.activeWorkspaceId);
   if (!activeWs) return;
-  const toMinimize = (state.windows as WindowState[])
-    .filter(w => activeWs.windowIds.includes(w.id) && w.state !== 'minimized')
-    .map(w => w.id);
+  const toMinimize: string[] = [];
+  for (let i = 0; i < state.windows.length; i++) {
+    const w = state.windows[i];
+    if (activeWs.windowIds.includes(w.id) && w.state !== 'minimized') {
+      toMinimize.push(w.id);
+      setState('windows', i, 'state', 'minimized');
+      setState('windows', i, 'focused', false);
+    }
+  }
   setState('_minimizedByShowDesktop', toMinimize);
-  setState('windows', ws => ws.map(w =>
-    toMinimize.includes(w.id) ? { ...w, state: 'minimized' as const, focused: false } : w
-  ));
 }
 
 export function restoreDesktop(): void {
   const ids = state._minimizedByShowDesktop;
   if (ids.length === 0) return;
   setState('_minimizedByShowDesktop', []);
-  setState('windows', ws => ws.map(w =>
-    ids.includes(w.id) ? { ...w, state: 'normal' as const } : w
-  ));
+  for (let i = 0; i < state.windows.length; i++) {
+    if (ids.includes(state.windows[i].id)) {
+      setState('windows', i, 'state', 'normal');
+    }
+  }
 }
 
 // ---- Notification Actions ----
@@ -308,9 +372,10 @@ export function dismissNotification(id: string): void {
 }
 
 export function markNotificationRead(id: string): void {
-  setState('notifications', prev => prev.map(n =>
-    n.id === id ? { ...n, read: true } : n
-  ));
+  const idx = state.notifications.findIndex(n => n.id === id);
+  if (idx >= 0) {
+    setState('notifications', idx, 'read', true);
+  }
 }
 
 export function clearNotifications(): void {
