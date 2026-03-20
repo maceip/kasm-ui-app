@@ -168,16 +168,14 @@ function clearResults() {
 }
 
 function startSequentialBenchmark() {
-  const phase = localStorage.getItem('bench_phase');
-  if (!phase) {
-    localStorage.removeItem('bench_react');
-    localStorage.removeItem('bench_solid');
-    localStorage.setItem('bench_phase', 'react');
-    setStatus('Starting React benchmark...', 'running');
-    setTimeout(() => {
-      location.href = 'run.html?fw=react&return=index.html';
-    }, 300);
-  }
+  // Always reset — handles stuck state from previous crashed runs
+  localStorage.removeItem('bench_react');
+  localStorage.removeItem('bench_solid');
+  localStorage.setItem('bench_phase', 'react');
+  setStatus('Starting React benchmark...', 'running');
+  setTimeout(() => {
+    location.href = 'run.html?fw=react&return=index.html';
+  }, 300);
 }
 
 (function checkPhase() {
