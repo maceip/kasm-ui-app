@@ -1,10 +1,10 @@
 {
-  "id": "/",
+  "id": "./",
   "name": "Kasm UI",
   "short_name": "Kasm",
   "description": "A bleeding-edge React desktop environment with docking, collaborative editing, virtual filesystem, and window management.",
-  "start_url": "/",
-  "scope": "/",
+  "start_url": "./",
+  "scope": "./",
   "lang": "en-US",
   "dir": "ltr",
   "categories": ["productivity", "utilities", "developer tools"],
@@ -23,43 +23,43 @@
 
   "icons": [
     {
-      "src": "/icons/icon-48.svg",
+      "src": "./icons/icon-48.svg",
       "sizes": "48x48",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-72.svg",
+      "src": "./icons/icon-72.svg",
       "sizes": "72x72",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-96.svg",
+      "src": "./icons/icon-96.svg",
       "sizes": "96x96",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-128.svg",
+      "src": "./icons/icon-128.svg",
       "sizes": "128x128",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-192.svg",
+      "src": "./icons/icon-192.svg",
       "sizes": "192x192",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.svg",
+      "src": "./icons/icon-512.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-maskable.svg",
+      "src": "./icons/icon-maskable.svg",
       "sizes": "512x512",
       "type": "image/svg+xml",
       "purpose": "maskable"
@@ -68,14 +68,14 @@
 
   "screenshots": [
     {
-      "src": "/icons/screenshot-wide.svg",
+      "src": "./icons/screenshot-wide.svg",
       "sizes": "1280x720",
       "type": "image/svg+xml",
       "form_factor": "wide",
       "label": "Kasm UI desktop environment with windows, panel, and apps"
     },
     {
-      "src": "/icons/screenshot-narrow.svg",
+      "src": "./icons/screenshot-narrow.svg",
       "sizes": "390x844",
       "type": "image/svg+xml",
       "form_factor": "narrow",
@@ -88,38 +88,38 @@
       "name": "Terminal",
       "short_name": "Term",
       "description": "Open a terminal emulator",
-      "url": "/?app=terminal",
-      "icons": [{ "src": "/icons/icon-terminal.svg", "sizes": "96x96", "type": "image/svg+xml" }]
+      "url": "./?app=terminal",
+      "icons": [{ "src": "./icons/icon-terminal.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
       "name": "File Manager",
       "short_name": "Files",
       "description": "Browse and manage files",
-      "url": "/?app=file-manager",
-      "icons": [{ "src": "/icons/icon-files.svg", "sizes": "96x96", "type": "image/svg+xml" }]
+      "url": "./?app=file-manager",
+      "icons": [{ "src": "./icons/icon-files.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
       "name": "Text Editor",
       "short_name": "Editor",
       "description": "Edit text files",
-      "url": "/?app=text-editor",
-      "icons": [{ "src": "/icons/icon-editor.svg", "sizes": "96x96", "type": "image/svg+xml" }]
+      "url": "./?app=text-editor",
+      "icons": [{ "src": "./icons/icon-editor.svg", "sizes": "96x96", "type": "image/svg+xml" }]
     },
     {
       "name": "Settings",
       "short_name": "Settings",
       "description": "System preferences",
-      "url": "/?app=settings"
+      "url": "./?app=settings"
     }
   ],
 
   "tab_strip": {
     "home_tab": {
-      "url": "/",
-      "icons": [{ "src": "/icons/icon-48.svg", "sizes": "48x48" }]
+      "url": "./",
+      "icons": [{ "src": "./icons/icon-48.svg", "sizes": "48x48" }]
     },
     "new_tab_button": {
-      "url": "/"
+      "url": "./"
     }
   },
 
@@ -176,7 +176,7 @@
   "protocol_handlers": [
     {
       "protocol": "web+kasm",
-      "url": "/?protocol=%s"
+      "url": "./?protocol=%s"
     }
   ],
 

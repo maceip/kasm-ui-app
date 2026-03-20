@@ -33,9 +33,9 @@
 
 <script>
 // -------------------------------------------------------
-// Single-framework benchmark runner
-// Loads one app at a time for fair measurement.
-// Results stored in localStorage, then redirects back.
+// Single-framework benchmark runner v2
+// Cache-busted, SW-bypassed, with complex interaction tests
+// for docking, tab reorder, window resize, split pane, snap
 // -------------------------------------------------------
 const params = new URLSearchParams(location.search);
 const fw = params.get('fw'); // 'react' or 'solid'
@@ -51,13 +51,39 @@ if (!fw || !['react', 'solid'].includes(fw)) {
 } else {
   fwLabel.textContent = fw === 'react' ? 'React' : 'SolidJS';
   fwLabel.classList.add(fw);
-  startBenchmark();
+  prepareThenRun();
 }
 
 function setProgress(pct) { progressFill.style.width = pct + '%'; }
 function setStatus(msg) { statusEl.textContent = msg; }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// -------------------------------------------------------
+// Cache-busting: unregister all SWs & clear caches
+// -------------------------------------------------------
+async function nukeCache() {
+  // Unregister all service workers so they can't serve cached assets
+  if ('serviceWorker' in navigator) {
+    const regs = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(regs.map(r => r.unregister()));
+  }
+  // Wipe all Cache API entries
+  if ('caches' in window) {
+    const keys = await caches.keys();
+    await Promise.all(keys.map(k => caches.delete(k)));
+  }
+}
+
+async function prepareThenRun() {
+  setStatus('Clearing caches for clean measurement...');
+  await nukeCache();
+  await sleep(200);
+  await startBenchmark();
+}
+
+// -------------------------------------------------------
+// Helpers
+// -------------------------------------------------------
 function waitForLoad(iframe) {
   return new Promise(resolve => {
     const check = () => {
@@ -71,7 +97,7 @@ function waitForLoad(iframe) {
   });
 }
 
-// Measure interaction: action → double-rAF
+// Measure: action → wait for two animation frames (paint commit)
 async function measureInteraction(iframe, actionFn) {
   const win = iframe.contentWindow;
   const t0 = win.performance.now();
@@ -84,7 +110,7 @@ function findEl(doc, selector, fallbackText) {
   let el = selector ? doc.querySelector(selector) : null;
   if (!el && fallbackText) {
     for (const node of doc.querySelectorAll('span, button, div, a')) {
-      if (node.textContent.trim() === fallbackText) { el = node; return el; }
+      if (node.textContent.trim() === fallbackText) { el = node; break; }
     }
   }
   return el;
@@ -117,13 +143,13 @@ async function typeAndMeasure(iframe, selector, text) {
   return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
 }
 
-async function dragAndMeasure(iframe, selector, dx, dy, steps) {
+// Continuous mouse-drag on an element (for titlebar drag, resize handles)
+async function dragAndMeasure(iframe, el, dx, dy, steps) {
   const win = iframe.contentWindow;
-  const el = win.document.querySelector(selector);
   if (!el) return null;
   const rect = el.getBoundingClientRect();
   const sx = rect.left + rect.width / 2;
-  const sy = rect.top + 8;
+  const sy = rect.top + rect.height / 2;
   const times = [];
 
   el.dispatchEvent(new win.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
@@ -139,6 +165,58 @@ async function dragAndMeasure(iframe, selector, dx, dy, steps) {
     clientX: sx + dx, clientY: sy + dy, bubbles: true
   }));
   return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
+}
+
+// HTML5 DnD sequence for tab reorder / dock
+async function dndAndMeasure(iframe, srcEl, destEl, dataTransferData) {
+  const win = iframe.contentWindow;
+  if (!srcEl || !destEl) return null;
+
+  const srcRect = srcEl.getBoundingClientRect();
+  const destRect = destEl.getBoundingClientRect();
+  const sx = srcRect.left + srcRect.width / 2;
+  const sy = srcRect.top + srcRect.height / 2;
+  const dx = destRect.left + destRect.width / 2;
+  const dy = destRect.top + destRect.height / 2;
+
+  // Create a DataTransfer-like shim
+  function makeDT() {
+    const data = {};
+    return {
+      types: Object.keys(dataTransferData || {}),
+      dropEffect: 'none',
+      effectAllowed: 'move',
+      setData(k, v) { data[k] = v; },
+      getData(k) { return data[k] || (dataTransferData && dataTransferData[k]) || ''; },
+      setDragImage() {},
+    };
+  }
+
+  const dt = makeDT();
+  const t0 = win.performance.now();
+
+  srcEl.dispatchEvent(new win.DragEvent('dragstart', {
+    clientX: sx, clientY: sy, bubbles: true, dataTransfer: dt,
+  }));
+
+  destEl.dispatchEvent(new win.DragEvent('dragenter', {
+    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
+  }));
+
+  destEl.dispatchEvent(new win.DragEvent('dragover', {
+    clientX: dx, clientY: dy, bubbles: true, cancelable: true, dataTransfer: dt,
+  }));
+
+  destEl.dispatchEvent(new win.DragEvent('drop', {
+    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
+  }));
+
+  srcEl.dispatchEvent(new win.DragEvent('dragend', {
+    clientX: dx, clientY: dy, bubbles: true, dataTransfer: dt,
+  }));
+
+  await new Promise(r => win.requestAnimationFrame(() => win.requestAnimationFrame(r)));
+  return win.performance.now() - t0;
 }
 
 function getLoadMetrics(iframe) {
@@ -169,12 +247,15 @@ function getMemory(iframe) {
 // -------------------------------------------------------
 async function startBenchmark() {
   const results = {};
-  const appUrl = fw === 'react' ? 'react/index.html' : 'solid/index.html';
+  // Cache-bust: append timestamp so the browser can't use HTTP cache
+  const cacheBust = '?_cb=' + Date.now();
+  const appUrl = (fw === 'react' ? 'react/index.html' : 'solid/index.html') + cacheBust;
 
-  // Record the precise time BEFORE we start loading the iframe
+  // =====================================================
+  // PHASE 1: LOAD METRICS
+  // =====================================================
   const loadStart = performance.now();
-
-  setStatus('Loading app...');
+  setStatus('Loading app (cache-busted)...');
   setProgress(5);
   frame.src = appUrl;
 
@@ -182,7 +263,6 @@ async function startBenchmark() {
   const loadEnd = performance.now();
   results['Cold Load (wall clock)'] = +(loadEnd - loadStart).toFixed(2);
 
-  // Collect navigation timing
   const load = getLoadMetrics(frame);
   results['DOM Interactive'] = +load.domInteractive.toFixed(2);
   results['DOM Content Loaded'] = +load.domContentLoaded.toFixed(2);
@@ -194,35 +274,40 @@ async function startBenchmark() {
   const mem0 = getMemory(frame);
   if (mem0) results['JS Heap Baseline (MB)'] = mem0.usedMB;
 
-  setProgress(15);
-  setStatus('Loaded. Waiting for app to settle...');
+  setProgress(10);
+  setStatus('Loaded. Settling...');
   await sleep(2000);
-  setProgress(20);
+  setProgress(15);
 
-  // --- Interactions ---
+  const doc = () => frame.contentWindow.document;
+  const win = () => frame.contentWindow;
+
+  // =====================================================
+  // PHASE 2: BASIC INTERACTIONS
+  // =====================================================
 
   // 1. Open App Menu
   setStatus('Opening app menu...');
   const t1 = await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
   if (t1 != null) results['Open App Menu'] = +t1.toFixed(2);
   await sleep(400);
-  setProgress(30);
+  setProgress(18);
 
   // 2. Category switch
   setStatus('Switching category...');
   const t2 = await clickAndMeasure(frame, '.kasm-app-menu__category:nth-child(3)', null);
   if (t2 != null) results['Category Switch'] = +t2.toFixed(2);
   await sleep(300);
-  setProgress(38);
+  setProgress(21);
 
   // 3. Launch Terminal
   setStatus('Launching Terminal...');
   const t3 = await clickAndMeasure(frame, null, '\u2B1B');
   if (t3 != null) results['Launch Terminal'] = +t3.toFixed(2);
   await sleep(600);
-  setProgress(48);
+  setProgress(25);
 
-  // 4. Terminal typing
+  // 4. Typing in terminal
   setStatus('Typing in terminal...');
   const t4 = await typeAndMeasure(frame,
     '.kasm-terminal__input, .kasm-terminal input, input[type="text"]',
@@ -230,58 +315,292 @@ async function startBenchmark() {
   );
   if (t4 != null) results['Keystroke Latency (avg)'] = +t4.toFixed(2);
   await sleep(300);
-  setProgress(58);
+  setProgress(28);
 
-  // 5. Window drag
-  setStatus('Dragging window...');
-  const t5 = await dragAndMeasure(frame, '.kasm-window__titlebar, .kasm-window-header', 200, 100, 40);
+  // =====================================================
+  // PHASE 3: WINDOW DRAG (continuous position updates)
+  // This stresses the reactivity system — every mousemove
+  // triggers x/y signal updates → style recalc on the window
+  // =====================================================
+  setStatus('Dragging window (60 frames)...');
+  const titlebar = doc().querySelector('.kasm-titlebar');
+  const t5 = await dragAndMeasure(frame, titlebar, 300, 150, 60);
   if (t5 != null) results['Window Drag (avg/frame)'] = +t5.toFixed(2);
   await sleep(300);
-  setProgress(68);
+  setProgress(34);
 
-  // 6. Open second app (Calculator)
-  setStatus('Opening calculator...');
-  await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
-  await sleep(400);
-  const t6 = await clickAndMeasure(frame, null, '\uD83D\uDD22');
-  if (t6 != null) results['Launch Calculator'] = +t6.toFixed(2);
+  // =====================================================
+  // PHASE 4: WINDOW RESIZE (SE corner drag)
+  // Triggers width+height signal updates + content reflow
+  // =====================================================
+  setStatus('Resizing window (60 frames)...');
+  const resizeSE = doc().querySelector('.kasm-window__resize--se');
+  const t6 = await dragAndMeasure(frame, resizeSE, 200, 150, 60);
+  if (t6 != null) results['Window Resize SE (avg/frame)'] = +t6.toFixed(2);
+  await sleep(300);
+  setProgress(40);
+
+  // =====================================================
+  // PHASE 5: WINDOW SNAP TO HALF-SCREEN
+  // Drag to edge → snap preview appears → drop → window
+  // snaps to half-screen. Tests snap zone detection +
+  // animated resize to target geometry.
+  // =====================================================
+  setStatus('Snap window to left edge...');
+  {
+    const tb = doc().querySelector('.kasm-titlebar');
+    if (tb) {
+      const rect = tb.getBoundingClientRect();
+      const sx = rect.left + rect.width / 2;
+      const sy = rect.top + rect.height / 2;
+      // Drag all the way to x=2 (left edge snap zone = 8px threshold)
+      const targetX = 2;
+      const steps = 40;
+      const dx = targetX - sx;
+      const w = win();
+      const times = [];
+
+      tb.dispatchEvent(new w.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+      for (let i = 1; i <= steps; i++) {
+        const t0 = w.performance.now();
+        w.document.dispatchEvent(new w.MouseEvent('mousemove', {
+          clientX: sx + (dx * i / steps), clientY: sy, bubbles: true
+        }));
+        await new Promise(r => w.requestAnimationFrame(r));
+        times.push(w.performance.now() - t0);
+      }
+      // Drop at edge — triggers snap
+      const snapT0 = w.performance.now();
+      w.document.dispatchEvent(new w.MouseEvent('mouseup', {
+        clientX: targetX, clientY: sy, bubbles: true
+      }));
+      await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
+      const snapTime = w.performance.now() - snapT0;
+
+      if (times.length) results['Snap Drag to Edge (avg/frame)'] = +(times.reduce((a,b)=>a+b,0) / times.length).toFixed(2);
+      results['Snap Commit'] = +snapTime.toFixed(2);
+    }
+  }
   await sleep(500);
+  setProgress(47);
+
+  // Restore from snap (double-click titlebar = toggle maximize/restore)
+  setStatus('Restore from snap...');
+  {
+    const tb = doc().querySelector('.kasm-titlebar');
+    if (tb) {
+      const tRestore = await measureInteraction(frame, (w) => {
+        tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true }));
+      });
+      results['Snap Restore (dblclick)'] = +tRestore.toFixed(2);
+    }
+  }
+  await sleep(300);
+
+  // Un-maximize back to floating
+  {
+    const tb = doc().querySelector('.kasm-titlebar');
+    if (tb) {
+      await measureInteraction(frame, (w) => {
+        tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true }));
+      });
+    }
+  }
+  await sleep(300);
+  setProgress(50);
+
+  // =====================================================
+  // PHASE 6: OPEN MULTIPLE WINDOWS + RAPID FOCUS SWITCHING
+  // Opens 3 more windows, then cycles focus across all of
+  // them. Each focus switch triggers z-index reorder +
+  // focused/unfocused class updates on every window.
+  // =====================================================
+  setStatus('Opening multiple windows...');
+
+  // Launch 3 more apps via app menu
+  const appsToLaunch = ['\uD83D\uDD22', '\uD83D\uDCC1', '\u2699\uFE0F']; // Calculator, Files, Settings
+  for (const icon of appsToLaunch) {
+    await clickAndMeasure(frame, '.kasm-app-menu-btn', 'Apps');
+    await sleep(300);
+    await clickAndMeasure(frame, null, icon);
+    await sleep(400);
+  }
+  setProgress(55);
+
+  // Rapid focus switching: click each window's titlebar
+  setStatus('Rapid window focus cycling...');
+  {
+    const windows = doc().querySelectorAll('.kasm-window');
+    const focusTimes = [];
+    // Cycle through all windows 3 times
+    for (let round = 0; round < 3; round++) {
+      for (const w of windows) {
+        const tb = w.querySelector('.kasm-titlebar');
+        if (!tb) continue;
+        const t = await measureInteraction(frame, (iwin) => {
+          tb.dispatchEvent(new iwin.MouseEvent('mousedown', { bubbles: true }));
+          tb.dispatchEvent(new iwin.MouseEvent('mouseup', { bubbles: true }));
+        });
+        focusTimes.push(t);
+      }
+    }
+    if (focusTimes.length) results['Focus Switch (avg)'] = +(focusTimes.reduce((a,b)=>a+b,0) / focusTimes.length).toFixed(2);
+  }
+  await sleep(300);
+  setProgress(60);
+
+  // =====================================================
+  // PHASE 7: MINIMIZE + RESTORE
+  // Minimize all, then restore — stresses list diffing
+  // (window list in panel updates for each min/restore)
+  // =====================================================
+  setStatus('Minimize/restore all windows...');
+  {
+    const minTimes = [];
+    const restoreTimes = [];
+
+    // Minimize all
+    let minBtns = doc().querySelectorAll('.kasm-titlebar__btn--minimize');
+    for (const btn of minBtns) {
+      const t = await measureInteraction(frame, (w) => {
+        btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+      minTimes.push(t);
+      await sleep(100);
+    }
+
+    // Restore all by clicking panel buttons
+    await sleep(300);
+    let panelBtns = doc().querySelectorAll('.kasm-panel-btn');
+    for (const btn of panelBtns) {
+      const t = await measureInteraction(frame, (w) => {
+        btn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+      restoreTimes.push(t);
+      await sleep(100);
+    }
+
+    if (minTimes.length) results['Minimize Window (avg)'] = +(minTimes.reduce((a,b)=>a+b,0) / minTimes.length).toFixed(2);
+    if (restoreTimes.length) results['Restore from Panel (avg)'] = +(restoreTimes.reduce((a,b)=>a+b,0) / restoreTimes.length).toFixed(2);
+  }
+  await sleep(300);
+  setProgress(66);
+
+  // =====================================================
+  // PHASE 8: SPLIT PANE RESIZE
+  // If any split pane exists, drag its splitter. This
+  // triggers continuous flex-basis recalc on both panes.
+  // =====================================================
+  setStatus('Resizing split pane...');
+  {
+    const splitter = doc().querySelector('.kasm-split-pane__splitter');
+    const t = await dragAndMeasure(frame, splitter, 150, 0, 50);
+    if (t != null) results['Split Pane Resize (avg/frame)'] = +t.toFixed(2);
+  }
+  await sleep(300);
+  setProgress(72);
+
+  // =====================================================
+  // PHASE 9: TAB REORDER (HTML5 DnD)
+  // Drag the first tab to the last tab position. Both React
+  // and Solid re-render the entire tab bar; Solid should
+  // only update the moved nodes.
+  // =====================================================
+  setStatus('Reordering tabs via drag-and-drop...');
+  {
+    const tabs = doc().querySelectorAll('.kasm-tab-panel__tab');
+    if (tabs.length >= 2) {
+      const srcTab = tabs[0];
+      const destTab = tabs[tabs.length - 1];
+      const t = await dndAndMeasure(frame, srcTab, destTab, {
+        'text/plain': '0',
+      });
+      if (t != null) results['Tab Reorder DnD'] = +t.toFixed(2);
+    }
+  }
+  await sleep(300);
   setProgress(78);
 
-  // 7. Rapid calculator clicks
-  setStatus('Rapid button clicks...');
-  const doc = frame.contentWindow.document;
-  const allBtns = doc.querySelectorAll('button');
-  let digitBtns = Array.from(allBtns).filter(b => /^[0-9]$/.test(b.textContent.trim()));
-  if (digitBtns.length === 0) digitBtns = Array.from(allBtns).slice(0, 5);
-  const calcTimes = [];
-  for (let i = 0; i < Math.min(20, digitBtns.length * 4); i++) {
-    const btn = digitBtns[i % digitBtns.length];
-    const t = await measureInteraction(frame, (win) => {
-      btn.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
+  // =====================================================
+  // PHASE 10: EXPO / SCALE VIEW
+  // Ctrl+Alt+Up toggles Expo (workspace overview with
+  // mini-windows rendered for each workspace).
+  // This creates a full-screen overlay + scales all windows.
+  // =====================================================
+  setStatus('Toggle Expo view...');
+  {
+    const w = win();
+    const tOpen = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'ArrowUp', code: 'ArrowUp',
+        ctrlKey: true, altKey: true, bubbles: true
+      }));
     });
-    calcTimes.push(t);
+    results['Expo View Open'] = +tOpen.toFixed(2);
+    await sleep(600);
+
+    // Close expo
+    const tClose = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'Escape', code: 'Escape', bubbles: true
+      }));
+    });
+    results['Expo View Close'] = +tClose.toFixed(2);
   }
-  if (calcTimes.length) results['Calc Button Click (avg)'] = +(calcTimes.reduce((a,b)=>a+b,0) / calcTimes.length).toFixed(2);
+  await sleep(300);
+  setProgress(83);
+
+  // Scale view (Ctrl+Alt+Down) — similar but shows individual windows
+  setStatus('Toggle Scale view...');
+  {
+    const tOpen = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'ArrowDown', code: 'ArrowDown',
+        ctrlKey: true, altKey: true, bubbles: true
+      }));
+    });
+    results['Scale View Open'] = +tOpen.toFixed(2);
+    await sleep(600);
+
+    const tClose = await measureInteraction(frame, (w) => {
+      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+        key: 'Escape', code: 'Escape', bubbles: true
+      }));
+    });
+    results['Scale View Close'] = +tClose.toFixed(2);
+  }
+  await sleep(300);
   setProgress(88);
 
-  // 8. Close window
-  setStatus('Closing window...');
-  const closeBtn = doc.querySelector('.kasm-window__close, [title="Close"]');
-  if (closeBtn) {
-    const t8 = await measureInteraction(frame, (win) => {
-      closeBtn.dispatchEvent(new win.MouseEvent('click', { bubbles: true, cancelable: true }));
-    });
-    results['Close Window'] = +t8.toFixed(2);
+  // =====================================================
+  // PHASE 11: CLOSE ALL WINDOWS (batch DOM removal)
+  // Close each window — tests how efficiently the framework
+  // removes components and cleans up event listeners
+  // =====================================================
+  setStatus('Closing all windows...');
+  {
+    const closeTimes = [];
+    let closeBtn;
+    while ((closeBtn = doc().querySelector('.kasm-titlebar__btn--close'))) {
+      const t = await measureInteraction(frame, (w) => {
+        closeBtn.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+      });
+      closeTimes.push(t);
+      await sleep(150);
+    }
+    if (closeTimes.length) results['Close Window (avg)'] = +(closeTimes.reduce((a,b)=>a+b,0) / closeTimes.length).toFixed(2);
   }
-  await sleep(200);
   setProgress(95);
 
-  // 9. Post-interaction memory
+  // =====================================================
+  // PHASE 12: MEMORY
+  // =====================================================
   const mem1 = getMemory(frame);
   if (mem1) results['JS Heap After (MB)'] = mem1.usedMB;
 
-  // Store results
+  // =====================================================
+  // STORE & REDIRECT
+  // =====================================================
   localStorage.setItem('bench_' + fw, JSON.stringify({
     framework: fw,
     timestamp: Date.now(),
@@ -293,7 +612,6 @@ async function startBenchmark() {
   setStatus('Done! Redirecting...');
   await sleep(500);
 
-  // Redirect back to comparison page
   location.href = returnTo;
 }
 </script>

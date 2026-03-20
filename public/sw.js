@@ -6,9 +6,9 @@
 
 const CACHE_NAME = 'kasm-ui-v1';
 const PRECACHE_URLS = [
-  '/',
-  '/index.html',
-  '/manifest.json',
+  './',
+  './index.html',
+  './manifest.json',
 ];
 
 // Install: precache shell
@@ -36,7 +36,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
   // Handle share target POST
-  if (event.request.method === 'POST' && url.pathname === '/') {
+  if (event.request.method === 'POST' && (url.pathname === '/' || url.pathname.endsWith('/kasm-ui-app/'))) {
     event.respondWith(handleShareTarget(event));
     return;
   }
@@ -49,13 +49,13 @@ self.addEventListener('fetch', (event) => {
   // Navigation requests: network-first with cache fallback
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request).catch(() => caches.match('/index.html'))
+      fetch(event.request).catch(() => caches.match(new URL('./index.html', self.location.href).href))
     );
     return;
   }
 
   // Static assets (JS, CSS, SVG, fonts): cache-first
-  if (url.pathname.startsWith('/assets/') || url.pathname.endsWith('.svg') || url.pathname.endsWith('.woff2')) {
+  if (url.pathname.includes('/assets/') || url.pathname.endsWith('.svg') || url.pathname.endsWith('.woff2')) {
     event.respondWith(
       caches.match(event.request).then((cached) => {
         if (cached) return cached;
@@ -114,7 +114,7 @@ async function handleShareTarget(event) {
   }
 
   // Redirect to the app
-  return Response.redirect('/?share=true', 303);
+  return Response.redirect('./?share=true', 303);
 }
 
 // Handle push notifications (future)
@@ -124,8 +124,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Kasm UI', {
       body: data.body || '',
-      icon: '/icons/icon-192.svg',
-      badge: '/icons/icon-96.svg',
+      icon: './icons/icon-192.svg',
+      badge: './icons/icon-96.svg',
       tag: data.tag || 'kasm-notification',
       data: data.url || '/',
     })
