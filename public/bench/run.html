@@ -582,13 +582,11 @@ async function startBenchmark() {
       const src = tabs[0], dest = tabs[tabs.length - 1];
       const w = W();
       const srcR = src.getBoundingClientRect(), destR = dest.getBoundingClientRect();
-      const data = {};
-      const dt = {
-        types: [], dropEffect: 'none', effectAllowed: 'move',
-        setData(k,v) { data[k]=v; this.types.push(k); },
-        getData(k) { return data[k]||''; },
-        setDragImage() {},
-      };
+      const dt = new DataTransfer();
+      dt.effectAllowed = 'move';
+      dt.setData('text/plain', '0');
+      dt.setData('application/kasm-tab-id', 'bench-tab');
+      dt.setData('application/kasm-source-panel', '');
       const t0 = w.performance.now();
       src.dispatchEvent(new DragEvent('dragstart', { clientX: srcR.left+srcR.width/2, clientY: srcR.top+srcR.height/2, bubbles: true, dataTransfer: dt }));
       dest.dispatchEvent(new DragEvent('dragenter', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, dataTransfer: dt }));
