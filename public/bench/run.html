@@ -125,8 +125,7 @@ async function measure(actionFn) {
 }
 
 function click(el) {
-  const w = W();
-  el.dispatchEvent(new w.MouseEvent('click', { bubbles: true, cancelable: true }));
+  el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
 }
 
 // Wait for an element to appear in the iframe DOM (up to timeout ms)
@@ -206,16 +205,16 @@ async function drag(el, dx, dy, steps) {
   const sy = rect.top + rect.height / 2;
   const times = [];
 
-  el.dispatchEvent(new w.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+  el.dispatchEvent(new MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
   for (let i = 1; i <= steps; i++) {
     const t0 = w.performance.now();
-    w.document.dispatchEvent(new w.MouseEvent('mousemove', {
+    w.document.dispatchEvent(new MouseEvent('mousemove', {
       clientX: sx + (dx * i / steps), clientY: sy + (dy * i / steps), bubbles: true
     }));
     await new Promise(r => w.requestAnimationFrame(r));
     times.push(w.performance.now() - t0);
   }
-  w.document.dispatchEvent(new w.MouseEvent('mouseup', {
+  w.document.dispatchEvent(new MouseEvent('mouseup', {
     clientX: sx + dx, clientY: sy + dy, bubbles: true
   }));
   return times.length ? times.reduce((a,b) => a+b, 0) / times.length : null;
@@ -367,9 +366,9 @@ async function startBenchmark() {
       for (const wEl of wins) {
         const tb = wEl.querySelector('.kasm-titlebar');
         if (!tb) continue;
-        const t = await measure((w) => {
-          tb.dispatchEvent(new w.MouseEvent('mousedown', { bubbles: true }));
-          tb.dispatchEvent(new w.MouseEvent('mouseup', { bubbles: true }));
+        const t = await measure(() => {
+          tb.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          tb.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
         });
         times.push(t);
       }
@@ -411,19 +410,19 @@ async function startBenchmark() {
       const times = [];
 
       // Snap left
-      tb.dispatchEvent(new w.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+      tb.dispatchEvent(new MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
       const steps = 40;
       const dx = 2 - sx; // drag to x=2
       for (let i = 1; i <= steps; i++) {
         const t0 = w.performance.now();
-        w.document.dispatchEvent(new w.MouseEvent('mousemove', {
+        w.document.dispatchEvent(new MouseEvent('mousemove', {
           clientX: sx + (dx * i / steps), clientY: sy, bubbles: true
         }));
         await new Promise(r => w.requestAnimationFrame(r));
         times.push(w.performance.now() - t0);
       }
       const snapT0 = w.performance.now();
-      w.document.dispatchEvent(new w.MouseEvent('mouseup', { clientX: 2, clientY: sy, bubbles: true }));
+      w.document.dispatchEvent(new MouseEvent('mouseup', { clientX: 2, clientY: sy, bubbles: true }));
       await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
       R['Snap Commit (left)'] = +(w.performance.now() - snapT0).toFixed(2);
       if (times.length) R['Snap Drag (avg/frame)'] = +(times.reduce((a,b)=>a+b,0)/times.length).toFixed(2);
@@ -438,10 +437,9 @@ async function startBenchmark() {
     const tb = D().querySelector('.kasm-window--focused .kasm-titlebar') || D().querySelector('.kasm-titlebar');
     if (tb) {
       // Restore first
-      const w2 = W();
-      tb.dispatchEvent(new w2.MouseEvent('dblclick', { bubbles: true }));
+      tb.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
       await sleep(300);
-      tb.dispatchEvent(new w2.MouseEvent('dblclick', { bubbles: true }));
+      tb.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
       await sleep(300);
 
       const rect = tb.getBoundingClientRect();
@@ -449,17 +447,17 @@ async function startBenchmark() {
       const w = W();
       const targetX = w.innerWidth - 2;
 
-      tb.dispatchEvent(new w.MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
+      tb.dispatchEvent(new MouseEvent('mousedown', { clientX: sx, clientY: sy, bubbles: true }));
       const steps = 40;
       const dx = targetX - sx;
       for (let i = 1; i <= steps; i++) {
-        w.document.dispatchEvent(new w.MouseEvent('mousemove', {
+        w.document.dispatchEvent(new MouseEvent('mousemove', {
           clientX: sx + (dx * i / steps), clientY: sy, bubbles: true
         }));
         await new Promise(r => w.requestAnimationFrame(r));
       }
       const snapT0 = w.performance.now();
-      w.document.dispatchEvent(new w.MouseEvent('mouseup', { clientX: targetX, clientY: sy, bubbles: true }));
+      w.document.dispatchEvent(new MouseEvent('mouseup', { clientX: targetX, clientY: sy, bubbles: true }));
       await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
       R['Snap Commit (right)'] = +(w.performance.now() - snapT0).toFixed(2);
       log('Snap right: ' + R['Snap Commit (right)'] + 'ms', 'ok');
@@ -471,10 +469,10 @@ async function startBenchmark() {
   {
     const tb = D().querySelector('.kasm-titlebar');
     if (tb) {
-      const t = await measure((w) => tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true })));
+      const t = await measure(() => tb.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
       R['Restore from Snap'] = +t.toFixed(2);
       await sleep(200);
-      await measure((w) => tb.dispatchEvent(new w.MouseEvent('dblclick', { bubbles: true })));
+      await measure(() => tb.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
     }
   }
   await sleep(200);
@@ -532,14 +530,14 @@ async function startBenchmark() {
   setStatus('Expo view (10 windows)...');
   {
     const tOpen = await measure((w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+      w.dispatchEvent(new KeyboardEvent('keydown', {
         key: 'ArrowUp', code: 'ArrowUp', ctrlKey: true, altKey: true, bubbles: true
       }));
     });
     R['Expo Open (10 wins)'] = +tOpen.toFixed(2);
     await sleep(600);
     const tClose = await measure((w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      w.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
     });
     R['Expo Close (10 wins)'] = +tClose.toFixed(2);
   }
@@ -549,14 +547,14 @@ async function startBenchmark() {
   setStatus('Scale view (10 windows)...');
   {
     const tOpen = await measure((w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', {
+      w.dispatchEvent(new KeyboardEvent('keydown', {
         key: 'ArrowDown', code: 'ArrowDown', ctrlKey: true, altKey: true, bubbles: true
       }));
     });
     R['Scale Open (10 wins)'] = +tOpen.toFixed(2);
     await sleep(600);
     const tClose = await measure((w) => {
-      w.dispatchEvent(new w.KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      w.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
     });
     R['Scale Close (10 wins)'] = +tClose.toFixed(2);
   }
@@ -592,11 +590,11 @@ async function startBenchmark() {
         setDragImage() {},
       };
       const t0 = w.performance.now();
-      src.dispatchEvent(new w.DragEvent('dragstart', { clientX: srcR.left+srcR.width/2, clientY: srcR.top+srcR.height/2, bubbles: true, dataTransfer: dt }));
-      dest.dispatchEvent(new w.DragEvent('dragenter', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, dataTransfer: dt }));
-      dest.dispatchEvent(new w.DragEvent('dragover', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, cancelable: true, dataTransfer: dt }));
-      dest.dispatchEvent(new w.DragEvent('drop', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, dataTransfer: dt }));
-      src.dispatchEvent(new w.DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
+      src.dispatchEvent(new DragEvent('dragstart', { clientX: srcR.left+srcR.width/2, clientY: srcR.top+srcR.height/2, bubbles: true, dataTransfer: dt }));
+      dest.dispatchEvent(new DragEvent('dragenter', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, dataTransfer: dt }));
+      dest.dispatchEvent(new DragEvent('dragover', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, cancelable: true, dataTransfer: dt }));
+      dest.dispatchEvent(new DragEvent('drop', { clientX: destR.left+destR.width/2, clientY: destR.top+destR.height/2, bubbles: true, dataTransfer: dt }));
+      src.dispatchEvent(new DragEvent('dragend', { bubbles: true, dataTransfer: dt }));
       await new Promise(r => w.requestAnimationFrame(() => w.requestAnimationFrame(r)));
       R['Tab Reorder DnD'] = +(w.performance.now() - t0).toFixed(2);
       log('Tab reorder: ' + R['Tab Reorder DnD'] + 'ms', 'ok');
