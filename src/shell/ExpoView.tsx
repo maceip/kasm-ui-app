@@ -29,8 +29,8 @@ export function ExpoView() {
       w => activeWs()?.windowIds.includes(w.id) && w.state !== 'minimized'
     )
   );
-  const cols = () => Math.ceil(Math.sqrt(visibleWindows().length));
-  const rows = () => Math.ceil(visibleWindows().length / cols()) || 1;
+  const cols = createMemo(() => Math.ceil(Math.sqrt(visibleWindows().length)));
+  const rows = createMemo(() => Math.ceil(visibleWindows().length / cols()) || 1);
 
   return (
     <Show when={desktop.expoMode !== 'off'}>

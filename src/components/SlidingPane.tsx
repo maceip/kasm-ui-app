@@ -4,6 +4,7 @@
 // ============================================================
 
 import { createSignal, createEffect, onCleanup, Show, type JSX } from 'solid-js';
+import { Portal } from 'solid-js/web';
 
 export interface SlidingPaneProps {
   isOpen: boolean;
@@ -89,7 +90,7 @@ export function SlidingPane(props: SlidingPaneProps) {
 
   return (
     <Show when={visible()}>
-      <>
+      <Portal>
         <div
           style={{
             position: 'fixed',
@@ -141,7 +142,7 @@ export function SlidingPane(props: SlidingPaneProps) {
             {props.children}
           </div>
         </div>
-      </>
+      </Portal>
     </Show>
   );
 }

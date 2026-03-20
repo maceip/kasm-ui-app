@@ -3,7 +3,7 @@
 // SolidJS port
 // ============================================================
 
-import { createSignal, createEffect, createMemo, onCleanup, Show, For, type JSX } from 'solid-js';
+import { createSignal, createMemo, onCleanup, Show, For, type JSX } from 'solid-js';
 import type { AppProps } from '../core/types';
 import { SplitPane } from '../layout/SplitPane';
 import { vfs } from './vfs';
@@ -241,6 +241,9 @@ export function NotesApp(props: AppProps) {
   const [content, setContent] = createSignal('');
   let saveTimer: ReturnType<typeof setTimeout> | null = null;
   let editorRef: HTMLTextAreaElement | undefined;
+
+  // Clean up pending save timer on unmount
+  onCleanup(() => { if (saveTimer) clearTimeout(saveTimer); });
 
   // Ensure notes directory exists
   if (!vfs.exists(NOTES_DIR)) vfs.mkdirp(NOTES_DIR);

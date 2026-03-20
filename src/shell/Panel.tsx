@@ -47,7 +47,6 @@ function computeOverlap(
 
 export function Panel() {
   const [hovered, setHovered] = createSignal(false);
-  let panelRef: HTMLDivElement | undefined;
 
   const hidden = createMemo(() => {
     const config = desktop.panelConfig;
@@ -74,7 +73,6 @@ export function Panel() {
   return (
     <>
       <div
-        ref={panelRef}
         class={`kasm-panel kasm-panel--${desktop.panelConfig.position} ${shouldSlide() ? 'kasm-panel--hidden' : ''} ${!desktop.agentSidebarOpen ? 'kasm-panel--no-sidebar' : ''}`}
         style={{
           height: `${desktop.panelConfig.height}px`,

@@ -4,6 +4,7 @@
 // ============================================================
 
 import { createSignal, createMemo, createEffect, onCleanup, Show, For } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { desktop, toggleAppMenu, closeAppMenu, createWindow } from '../core/store';
 import { appRegistry, appCategories } from '../apps/registry';
 import { LiquidGlass } from '../components/LiquidGlass';
@@ -92,6 +93,7 @@ export function AppMenu() {
 
   return (
     <Show when={desktop.appMenuOpen}>
+      <Portal>
       <div class="kasm-app-menu" ref={menuRef} onKeyDown={handleKeyDown}>
         <div class="kasm-app-menu__search">
           <input
@@ -146,6 +148,7 @@ export function AppMenu() {
           </button>
         </div>
       </div>
+      </Portal>
     </Show>
   );
 }

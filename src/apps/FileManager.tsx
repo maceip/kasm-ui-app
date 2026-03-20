@@ -4,6 +4,7 @@
 // ============================================================
 
 import { createSignal, createMemo, createEffect, onCleanup, Show, For, type JSX } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { AppProps } from '../core/types';
 import './apps.css';
 import { vfs } from './vfs';
@@ -652,7 +653,7 @@ export function FileManager({ windowId }: AppProps) {
       {/* Context menu */}
       <Show when={contextMenu()}>
         {(cm) => (
-          <div
+          <Portal><div
             style={{
               "position": "fixed",
               "left": `${cm().x}px`,
@@ -699,7 +700,7 @@ export function FileManager({ windowId }: AppProps) {
             </Show>
             <CtxDivider />
             <CtxItem label="Refresh" onClick={() => { closeContextMenu(); forceRefresh(); }} />
-          </div>
+          </div></Portal>
         )}
       </Show>
     </div>

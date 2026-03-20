@@ -3,7 +3,7 @@
 // Toast popups + notification tray in panel
 // ============================================================
 
-import { createSignal, createEffect, Show, For } from 'solid-js';
+import { createSignal, createEffect, on, Show, For } from 'solid-js';
 import { desktop, dismissNotification, markNotificationRead, clearNotifications } from '../core/store';
 import { formatTimeAgo } from '../lib/domUtils';
 import type { Notification } from '../core/types';
@@ -81,8 +81,6 @@ function NotificationTray(props: { onClose: () => void }) {
 // Toast popup manager
 export function NotificationToasts() {
   const [toasts, setToasts] = createSignal<Notification[]>([]);
-  let prevIds: string[] = [];
-
   function handleNotification(notification: Notification) {
     setToasts(prev => [notification, ...prev].slice(0, 5));
     const duration = notification.duration ?? (notification.urgency === 'critical' ? 8000 : 4000);
@@ -93,13 +91,16 @@ export function NotificationToasts() {
     }
   }
 
-  createEffect(() => {
-    const notifications = desktop.notifications;
-    const currentIds = notifications.map(n => n.id);
-    const newOnes = notifications.filter(n => !prevIds.includes(n.id));
-    newOnes.forEach(n => handleNotification(n));
-    prevIds = currentIds;
-  });
+  // Track notification IDs reactively; `on()` provides the previous value
+  // so we never mutate external state outside the reactive graph.
+  createEffect(on(
+    () => desktop.notifications.map(n => n.id),
+    (currentIds, prevIds) => {
+      const prev = prevIds ?? [];
+      const newOnes = desktop.notifications.filter(n => !prev.includes(n.id));
+      newOnes.forEach(n => handleNotification(n));
+    }
+  ));
 
   return (
     <Show when={toasts().length > 0}>
