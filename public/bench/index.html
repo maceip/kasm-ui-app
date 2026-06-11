@@ -163,8 +163,21 @@ function clearResults() {
   localStorage.removeItem('bench_react');
   localStorage.removeItem('bench_solid');
   localStorage.removeItem('bench_phase');
+  localStorage.removeItem('bench_started_at');
   renderResults();
   setStatus('Results cleared. Ready to run.', 'idle');
+}
+
+// A run is only "active" while this token stays fresh. It is set the moment the
+// user clicks Run and refreshed by run.html between phases, so the React->SolidJS
+// hand-off auto-advances — but a stale token (reopened tab, crashed run) never does.
+const RUN_FRESH_MS = 2 * 60 * 1000;
+function markRunActive() {
+  localStorage.setItem('bench_started_at', String(Date.now()));
+}
+function isRunActive() {
+  const t = Number(localStorage.getItem('bench_started_at') || 0);
+  return t > 0 && (Date.now() - t) < RUN_FRESH_MS;
 }
 
 function startSequentialBenchmark() {
@@ -172,6 +185,7 @@ function startSequentialBenchmark() {
   localStorage.removeItem('bench_react');
   localStorage.removeItem('bench_solid');
   localStorage.setItem('bench_phase', 'react');
+  markRunActive();
   setStatus('Starting React benchmark...', 'running');
   setTimeout(() => {
     location.href = 'run.html?fw=react&return=index.html';
@@ -388,21 +402,39 @@ function renderTable(title, keys, rr, sr) {
 // -------------------------------------------------------
 (function checkPhase() {
   const phase = localStorage.getItem('bench_phase');
-  if (phase === 'react') {
-    const reactData = localStorage.getItem('bench_react');
-    if (reactData) {
-      localStorage.setItem('bench_phase', 'solid');
-      setStatus('React done. Starting SolidJS benchmark...', 'running');
-      setTimeout(() => {
-        location.href = 'run.html?fw=solid&return=index.html';
-      }, 500);
-      return;
-    }
+  const active = isRunActive();
+
+  // --- Active run only: chain React -> SolidJS automatically ---
+  // This is the ONLY path that may navigate on load, and it requires a fresh
+  // run token, so a cold page load can never kick off a benchmark by itself.
+  if (active && phase === 'react' && localStorage.getItem('bench_react')) {
+    localStorage.setItem('bench_phase', 'solid');
+    markRunActive();
+    setStatus('React done. Starting SolidJS benchmark...', 'running');
+    setTimeout(() => {
+      location.href = 'run.html?fw=solid&return=index.html';
+    }, 500);
+    return;
   }
-  if (phase === 'solid') {
-    localStorage.removeItem('bench_phase');
+
+  // --- Active run just finished the SolidJS phase ---
+  if (active && phase === 'solid') {
     setStatus('Benchmark complete!', 'done');
+  } else if (phase) {
+    // Leftover phase with no active run = stale state from a previous or
+    // interrupted session. Never auto-run: reset to a clean idle page. Drop a
+    // half-finished run so we don't get stuck showing "waiting for the other...".
+    if (!localStorage.getItem('bench_react') || !localStorage.getItem('bench_solid')) {
+      localStorage.removeItem('bench_react');
+      localStorage.removeItem('bench_solid');
+    }
+    setStatus('Ready. Click "Run Benchmark" to start.', 'idle');
   }
+
+  // Settle the state machine so the next load starts clean.
+  localStorage.removeItem('bench_phase');
+  localStorage.removeItem('bench_started_at');
+
   renderResults();
 })();
 </script>

@@ -637,6 +637,9 @@ async function startBenchmark() {
   setProgress(100);
   setStatus('Done! Redirecting...');
   log('--- DONE ---', 'ok');
+  // Refresh the active-run token so index.html treats the hand-off to the next
+  // framework as a live run (and keeps auto-advancing) even on slow machines.
+  localStorage.setItem('bench_started_at', String(Date.now()));
   await sleep(800);
   location.href = returnTo;
 }
