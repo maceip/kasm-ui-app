@@ -1,6 +1,6 @@
 # React + TypeScript + Vite
 
-Live React vs SolidJS benchmark: https://maceip.github.io/kasm-ui-app/bench/
+Live React vs SolidJS benchmark: <https://maceip.github.io/kasm-ui-app/bench/>
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
