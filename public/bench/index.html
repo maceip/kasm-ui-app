@@ -215,8 +215,15 @@ const WHY = {
     Solid's <code>&lt;For&gt;</code> tracks items by reference and moves the actual DOM node.
     Expo/Scale views create a full-screen overlay with N mini-windows — tests mount/unmount cost.`,
 
-  'Memory': `<strong>No virtual DOM in memory:</strong> React maintains a fiber tree + VDOM tree for every
-    component. SolidJS stores only signals and their subscriptions. The gap grows with window count.`,
+  'Memory': `<strong>&#9888; Not a reliable comparison — read with caution.</strong>
+    These figures come from <code>performance.memory.usedJSHeapSize</code>, a non-standard, Chrome-only
+    API whose values are <strong>quantized into coarse buckets</strong> for security (anti-fingerprinting).
+    The bucket size dwarfs the actual gap between the frameworks (Solid's ~7&nbsp;KB runtime vs React's
+    ~45&nbsp;KB), so both typically report the <em>exact same</em> number. It also measures the whole
+    renderer-process heap — dominated by browser + harness overhead — not each framework's retained
+    memory. Accurate per-origin measurement needs <code>measureUserAgentSpecificMemory()</code>, which
+    requires cross-origin isolation (COOP/COEP headers) that static GitHub Pages can't set. Treat these
+    rows as a known-broken metric, not evidence.`,
 };
 
 // -------------------------------------------------------
@@ -309,7 +316,9 @@ function renderResults() {
   // --- Bar chart ---
   html += '<h3 class="section-title">Visual Comparison</h3>';
   html += '<div class="bar-chart">';
-  const barKeys = allKeys.filter(k => !cacheKeys.includes(k) && typeof rr[k] === 'number' && typeof sr[k] === 'number');
+  // Exclude Heap/memory keys from the chart: performance.memory is quantized and
+  // not a valid framework comparison (see the Memory section note below).
+  const barKeys = allKeys.filter(k => !cacheKeys.includes(k) && !k.includes('Heap') && typeof rr[k] === 'number' && typeof sr[k] === 'number');
   for (const key of barKeys) {
     const rv = rr[key], sv = sr[key];
     if (rv == null || sv == null) continue;
